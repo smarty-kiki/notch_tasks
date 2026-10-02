@@ -97,6 +97,11 @@ else
   echo "   ⚠️  缺少 Resources/AppIcon.icns（跑 swift tools/make-icon.swift 生成）"
 fi
 
+# 许可与版权声明跟着产物一起走。
+# MIT 要求「所有副本或实质性部分」都得带上这段声明——放进 bundle 之后，
+# 谁转发 .app / dmg，声明就跟着谁走，不会中途丢掉。
+cp -f "$ROOT/LICENSE" "$BUNDLE/Contents/Resources/LICENSE"
+
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
                         -c "Set :CFBundleVersion $BUILD_NUMBER" \
                         "$BUNDLE/Contents/Info.plist" >/dev/null

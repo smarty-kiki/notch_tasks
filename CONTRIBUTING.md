@@ -247,3 +247,15 @@ dmg 里除了 `.app`，还放了一个指向 `/Applications` 的软链——用�
 注意是 **ad-hoc 签名**，不是 Developer ID，用户首次打开需要右键 →「打开」。
 要正经签名得配 Apple Developer 证书并在工作流里加 `codesign` + `notarytool`，
 目前还没做。
+
+## 许可
+
+本项目以 [MIT](LICENSE) 发布，版权归 `LICENSE` 里那位署名者所有。
+
+- **进来的**：你提的 PR 一经合并，即视为同意以 MIT 协议授权（inbound = outbound），
+  不额外签 CLA。PR 模板里有这一条勾选
+- **出去的**：MIT 要求所有副本或实质性部分都带上版权声明与许可文本，
+  所以别删 `LICENSE`；`build.sh` 会把它一并放进
+  `.app/Contents/Resources/`，产物转发到哪，声明就跟到哪
+- **引用别人代码**：引入任何第三方代码前先开 issue 说一声，并在
+  `THIRD-PARTY-NOTICES.md` 里记上来源与许可——本项目目前零依赖，希望保持这样

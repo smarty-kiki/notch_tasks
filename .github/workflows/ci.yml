@@ -47,6 +47,11 @@ jobs:
         run: |
           APP=dist/NotchTasks.app
           test -x "$APP/Contents/MacOS/NotchTasks"
+          # 许可与版权声明必须跟着产物走（MIT 的要求），别在改动里掉了
+          test -f "$APP/Contents/Resources/LICENSE"
+          grep -q "MIT License" "$APP/Contents/Resources/LICENSE"
+          test -f "$APP/Contents/Resources/AppIcon.icns"
           lipo -archs "$APP/Contents/MacOS/NotchTasks"
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist"
+          codesign --verify --strict "$APP"
           codesign -dv "$APP" 2>&1 | head -3 || true

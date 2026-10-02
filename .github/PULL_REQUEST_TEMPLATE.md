@@ -10,7 +10,7 @@
 
 - [ ] `make test` 通过
 - [ ] 本地 `./run.sh` 肉眼确认过
-- [ ] 涉及界面改动时，已提交 `docs/preview/` 的更新（`make preview`）
+- [ ] 涉及界面改动时，已提交 `docs/` 的更新（`make screenshots`，用合成数据）
 
 ## 自查
 
@@ -19,6 +19,7 @@
 - [ ] 如果改了底栏按钮或行布局，`UIState.hitTest` 的命中区间同步改了
 - [ ] 如果改了 `UIState` 里的布局常量，`scripts/smoke-test.sh` 里的期望尺寸同步改了
 - [ ] 提交信息符合 Conventional Commits（`feat:` / `fix:` / `docs:` / `chore:` …）
+- [ ] 同意本次贡献以 [MIT](LICENSE) 协议授权（与项目当前许可一致）
 
 ## 截图 / 录屏
 

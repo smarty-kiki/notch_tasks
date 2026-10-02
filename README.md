@@ -342,4 +342,19 @@ scripts/
 
 ## 许可
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 yaoyang
+
+随便用：可以自由使用、修改、商用、闭源分发，不需要事先问我。
+**但有一件事必须做**——MIT 的条件是：
+
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+> （上述版权声明与本许可声明，必须包含在本软件的所有副本或实质性部分中。）
+
+也就是说，**无论怎么改、怎么分发，都得保留 `LICENSE` 里的版权声明和许可文本**，
+不能抹掉作者。为了不让这条在转发途中丢掉，`LICENSE` 也被打进了
+`.app/Contents/Resources/`，下载 dmg / zip 的人拿到产物时就带着它。
+
+> 需要说明的是：MIT 只保证「署名」，不保证「衍生作品也开源」。
+> 别人改完可以闭源发布，只要保留声明即可。
+> 如果你要的是「改了也必须开源」，那得用 GPL-3.0 / AGPL-3.0——但本项目是按 MIT 发布的。

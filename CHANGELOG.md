@@ -75,6 +75,9 @@
 - GitHub Actions：`ci.yml` 跑构建 + 冒烟 + 通用二进制 + 脚本语法；
   `release.yml` 推 `v*` 标签即打包发布，release notes 取自本文件的对应段落
 - 无 GUI 自检命令：`--dump` / `--states` / `--hittest` / `--preview` / `--animframes`
+- **许可是 MIT**，`LICENSE` 会随产物一起分发：`build.sh` 把它拷进
+  `.app/Contents/Resources/`。MIT 要求所有副本或实质性部分都带上版权声明与许可文本，
+  放进 bundle 之后，转发 dmg / zip 的人不会再中途把作者弄丢
 
 ### 说明
 
