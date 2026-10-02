@@ -1,0 +1,61 @@
+name: Release
+
+# 推一个 v* 标签就发版；也可以在 Actions 页面手动指定版本号触发
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号，不要带 v（例如 1.0.0）"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 打包并发布
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # 生成 release notes 需要完整历史
+
+      - name: 解析版本号
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          case "$V" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "版本号格式不对：$V（应形如 1.0.0）" >&2; exit 1 ;;
+          esac
+          echo "version=$V"    >> "$GITHUB_OUTPUT"
+          echo "tag=v$V"       >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$V" > VERSION
+          echo "本次发布：v$V"
+
+      - name: 构建通用二进制并打包
+        run: ./package.sh
+
+      - name: 冒烟测试
+        run: ./scripts/smoke-test.sh
+
+      - name: 列出产物
+        run: ls -lh dist/
+
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          ZIP="$(ls dist/NotchTasks-*.zip)"
+          gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
+            --title "任务坞 ${{ steps.ver.outputs.version }}" \
+            --generate-notes
+          echo "已发布 $TAG"

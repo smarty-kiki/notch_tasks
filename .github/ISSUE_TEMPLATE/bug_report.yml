@@ -1,0 +1,70 @@
+name: 🐛 报告问题
+description: 有东西不正常？描述一下复现步骤
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先跑一下这几条，输出贴进来会快很多：
+
+        ```bash
+        sw_vers
+        ./build/NotchTasks --dump
+        NOTCHTASKS_DEBUG=1 ./dist/NotchTasks.app/Contents/MacOS/NotchTasks
+        ```
+
+        （注意 `--dump` 会打印任务标题和工作目录，贴之前先看一眼有没有敏感信息。）
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 你看到的是什么？期望是什么？
+      placeholder: 鼠标移开后把手没有收起，一直保持展开……
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 悬停右边缘的把手
+        2. 移开鼠标
+        3. 等 5 秒后把手仍是展开的
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS 版本
+      placeholder: "14.5 (23F79)"
+    validations:
+      required: true
+
+  - type: input
+    id: appversion
+    attributes:
+      label: 任务坞版本
+      description: 菜单栏图标 →「关于」，或跑 `defaults read dist/NotchTasks.app/Contents/Info.plist CFBundleShortVersionString`
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: arch
+    attributes:
+      label: 芯片
+      placeholder: "Apple Silicon (M2) / Intel"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 带 `NOTCHTASKS_DEBUG=1` 跑出来的输出
+      render: shell
+    validations:
+      required: false

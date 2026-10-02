@@ -1,0 +1,33 @@
+name: ✨ 功能建议
+description: 想要什么能力？说说你的使用场景
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: scene
+    attributes:
+      label: 使用场景
+      description: 你在做什么事情的时候觉得缺了这个能力？
+      placeholder: 我同时开了好几个 Claude Code 会话，想一眼看出哪个在等我输入……
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 期望的做法
+      description: 你希望它长什么样 / 怎么交互？有草图更好
+    validations:
+      required: false
+
+  - type: textarea
+    id: alt
+    attributes:
+      label: 考虑过的替代方案
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        > 提之前可以先看一眼 [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) 里「改 UI 前必读的三个坑」，
+        > 有些看着简单的改动其实受窗口机制限制（比如点击不能用 SwiftUI 手势）。

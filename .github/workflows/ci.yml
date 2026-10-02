@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 构建 + 冒烟测试
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 工具链版本
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: 脚本语法检查
+        run: |
+          for f in build.sh package.sh run.sh scripts/*.sh; do
+            bash -n "$f" || exit 1
+            echo "  ✓ $f"
+          done
+
+      - name: 构建
+        run: ./build.sh
+
+      - name: 冒烟测试
+        run: ./scripts/smoke-test.sh
+
+      - name: 通用二进制（arm64 + x86_64）
+        run: ./build.sh --clean --universal
+
+      - name: 确认产物信息
+        run: |
+          APP=dist/NotchTasks.app
+          test -x "$APP/Contents/MacOS/NotchTasks"
+          lipo -archs "$APP/Contents/MacOS/NotchTasks"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist"
+          codesign -dv "$APP" 2>&1 | head -3 || true

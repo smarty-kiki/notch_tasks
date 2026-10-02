@@ -1,0 +1,25 @@
+# 构建产物
+build/
+dist/
+
+# macOS
+.DS_Store
+._*
+
+# 编辑器
+.vscode/
+.idea/
+*.xcworkspace/
+xcuserdata/
+*.swp
+
+# Swift
+*.o
+*.dSYM/
+.swiftpm/
+
+# 本地临时
+/tmp-preview/
+
+# sed -i 在 BSD 上的残留临时文件
+.!*!*
