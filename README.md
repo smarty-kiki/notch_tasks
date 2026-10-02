@@ -82,7 +82,7 @@ cd notch_tasks
 | 操作 | 效果 |
 |---|---|
 | 鼠标扫到把手 | 展开面板 |
-| 鼠标移开约 1 秒 | 收起（倒计时从离开那一刻起算，中途回到面板上会撤销） |
+| 鼠标移开约 0.5 秒 | 开始收起（倒计时从离开那一刻起算，中途回到面板上会撤销） |
 | 点任务行 | 回它的老家：`WorkBuddy` 标签 → 切回 WorkBuddy；`Claude CLI` 标签 → 切到 iTerm2 |
 | 面板底栏 | 打开 WorkBuddy / 立即刷新 / 声音开关 / 退出 |
 | **菜单栏图标** | 显示·收起面板、立即刷新、声音提醒、系统通知、显示已完成、显示条数（4 / 6 / 8 条）、显示屏幕（多屏时）、打开 WorkBuddy、退出 |
@@ -231,6 +231,22 @@ Space 和全屏应用之上——这是刻意的，否则切到全屏应用就�
 </details>
 
 <details>
+<summary><b>收起时面板为什么不会「整个消失」</b></summary>
+
+收起和展开的顺序是反着来的，但同样讲究：**只把 `progress` 放进动画事务**，
+`ui.expanded`（决定内容层画面板还是把手）和窗口尺寸都等动画播完才落。
+
+一开始不是这么写的——`collapse()` 一进门就把 `expanded` 翻成 false，
+于是内容层瞬间从面板换成把手，屏幕上变成「一块满尺寸的黑色空面板僵在那儿 0.22 秒，
+然后啪地收掉」。看着就是卡顿，其实是内容层被提前砍了。
+
+现在面板会留在原地，被越来越小的形状**从左边逐步裁掉**，收完才换成把手——
+此时形状已经缩到把手尺寸，两者位置重合，切换无缝。收到一半又把鼠标移回来，
+`expand()` 会把 progress 反向播回去，不会卡在半路。
+
+</details>
+
+<details>
 <summary><b>展开动画为什么一定从把手那一点长出来</b></summary>
 
 把手和面板是**同一个形状在变形**，锚点直接写在路径计算里
@@ -315,7 +331,20 @@ NOTCHTASKS_FORCE_ALERT=confirm|done|running|idle ./dist/NotchTasks.app/Contents/
 NOTCHTASKS_DEBUG=1 ./dist/NotchTasks.app/Contents/MacOS/NotchTasks   # 打印几何 / 命中 / 鼠标策略
 ```
 
-在**真实窗口**里抓展开动画的帧（离屏渲染验证不了窗口与容器在各时刻的实际状态）：
+在**真实窗口**里抓收起过程的帧（一次运行只抓一帧，改 `_AT` 多跑几次拼出时间曲线）：
+
+```bash
+for t in 0.02 0.05 0.08 0.11 0.14 0.17 0.20; do
+  NOTCHTASKS_COLLAPSEPROBE=/tmp/cp/$t NOTCHTASKS_COLLAPSEPROBE_AT=$t \
+    ./dist/NotchTasks.app/Contents/MacOS/NotchTasks
+done
+```
+
+> 为什么不一次多抓几帧：`cacheDisplay` 是同步渲染整棵视图树，一次就要几十毫秒。
+> 在一次 0.22s 的动画里连抓五六帧会把主线程占满，等于自己把动画卡住，
+> 抓到的帧张张相同——那样量到的不是动画，是阻塞。
+
+抓**展开**动画的帧：
 
 ```bash
 NOTCHTASKS_DEBUG=1 NOTCHTASKS_ANIMPROBE=/tmp/live \

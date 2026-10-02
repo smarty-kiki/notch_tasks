@@ -80,14 +80,13 @@ final class NotchController {
         installGlobalMonitor()
         installClickMonitor()
         updateMouseEventPolicy()
-        installClickMonitor()
 
         if let dir = ProcessInfo.processInfo.environment["NOTCHTASKS_ANIMPROBE"] {
             runAnimProbe(outDir: dir)
         }
-
-        if let dir = ProcessInfo.processInfo.environment["NOTCHTASKS_ANIMPROBE"] {
-            runAnimProbe(outDir: dir)
+        // 收起过程的抓帧：专门用来核对「面板是不是一开始就整个消失」
+        if let dir = ProcessInfo.processInfo.environment["NOTCHTASKS_COLLAPSEPROBE"] {
+            runCollapseProbe(outDir: dir)
         }
 
         screenObserver = NotificationCenter.default.addObserver(
@@ -102,7 +101,6 @@ final class NotchController {
     func stop() {
         store.stop()
         if let m = globalMonitor { NSEvent.removeMonitor(m) }
-        if let m = clickMonitor { NSEvent.removeMonitor(m) }
         if let m = clickMonitor { NSEvent.removeMonitor(m) }
         if let o = screenObserver { NotificationCenter.default.removeObserver(o) }
     }
@@ -253,17 +251,23 @@ final class NotchController {
 
     // MARK: 展开 / 收起
 
+    /// 抓帧探针期间置 true：抑制「鼠标移开自动收起」，
+    /// 否则探针还没轮到调用 collapse()，鼠标已经把它收掉了，抓到的全是收完的稳定态
+    private var suppressAutoCollapse = false
+
     /// 鼠标离开后多久开始收起。从「离开那一刻」起算，不会因为继续移动而被推迟。
-    /// 收缩动画本身还要 0.22s，所以这里取 0.8s，用户感知到的整体延迟约 1 秒。
-    private let collapseDelay: TimeInterval = 0.80
+    /// 0.5s 等待 + 0.22s 收缩动画，感知上约 0.7s 就收干净。
+    private let collapseDelay: TimeInterval = 0.50
     private let collapseAnimationDuration: TimeInterval = 0.22
 
     func expand() {
         cancelCollapse()
         shrinkWork?.cancel()
         shrinkWork = nil
-        guard !ui.expanded else { return }
         panel.allowsKey = true
+        // 已经完整展开就没事可做；但「收到一半又回来」要能反向播回去，
+        // 所以判据是 progress 而不是 expanded（后者在收回动画播完前一直是 true）
+        guard !(ui.expanded && ui.progress >= 0.999) else { return }
 
         // 顺序很关键：
         // 1. 窗口先撑到展开尺寸，生长动画才不会被窗口边界裁掉
@@ -290,6 +294,7 @@ final class NotchController {
     /// 开始收起倒计时。已在倒计时中则保持原有截止时间，不重置——
     /// 否则鼠标持续移动会把收起无限推迟。
     func scheduleCollapse() {
+        guard !suppressAutoCollapse else { return }
         guard collapseWork == nil else { return }
         let w = DispatchWorkItem { [weak self] in
             self?.collapseWork = nil
@@ -309,22 +314,35 @@ final class NotchController {
         guard ui.expanded else { return }
         panel.allowsKey = false
 
-        // 同理：ui.expanded 不进动画事务，容器尺寸立刻切回，只动画 progress。
-        // 窗口此时仍保持展开尺寸，contentLayer 继续铺满 440×314，形状不会跳位。
-        ui.expanded = false
-        updateMouseEventPolicy()
+        // 顺序和展开时一样讲究：
+        // 1. **只**把 progress 放进动画事务，先把形状收回去。
+        //    `ui.expanded` 与内容层这一拍都不动 —— 面板留在原地被越来越小的形状裁掉，
+        //    这才是「收回去」。以前这里一进门就把 expanded 翻成 false，
+        //    内容层瞬间从面板换成把手，屏幕上是「一块满尺寸的黑色空面板僵在
+        //    那儿 0.22 秒，然后啪地收掉」，看着就是卡顿。
+        // 2. 动画播完再切内容、缩窗口。此时形状已经小到把手尺寸，
+        //    内容从面板换成把手正好无缝，也不会把动画裁掉。
         withAnimation(.easeInOut(duration: collapseAnimationDuration)) {
             ui.progress = 0
         }
-        // 收缩动画播完再缩小窗口；中途又被悬停则不缩
+
         shrinkWork?.cancel()
         let w = DispatchWorkItem { [weak self] in
-            guard let self, !self.ui.expanded else { return }
-            self.applyFrame(expanded: false)
+            guard let self else { return }
+            // 动画期间又被悬停回来就别收尾（expand() 会把这条 cancel 掉）
+            guard self.ui.progress < 0.001 else { return }
+            self.finishCollapse()
         }
         shrinkWork = w
         logSettled()
-        DispatchQueue.main.asyncAfter(deadline: .now() + collapseAnimationDuration + 0.04, execute: w)
+        DispatchQueue.main.asyncAfter(deadline: .now() + collapseAnimationDuration + 0.02, execute: w)
+    }
+
+    /// 收回动画播完后的收尾：切内容层、更新鼠标策略、把窗口缩回把手尺寸
+    private func finishCollapse() {
+        ui.expanded = false
+        updateMouseEventPolicy()
+        applyFrame(expanded: false)
     }
 
     func toggleExpand() {
@@ -352,12 +370,41 @@ final class NotchController {
         }
     }
 
-    private func captureFrame(index: Int, at t: Double, outDir: String) {
+    /// 展开 → 停一下 → 收起，并在收回过程的**某一个**时间点抓一帧。
+    ///
+    /// 为什么只抓一帧：`cacheDisplay` 是同步渲染整棵视图树（近百万像素），
+    /// 一次就要几十毫秒。若在一次动画里连抓五六帧，主线程基本被占满，
+    /// 动画推进会被自己卡住，抓到的帧张张相同——那样量出来的不是动画，是阻塞。
+    /// 所以抓帧时刻由 `NOTCHTASKS_COLLAPSEPROBE_AT` 指定，多次运行拼出时间曲线。
+    func runCollapseProbe(outDir: String) {
+        try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
+        let at = ProcessInfo.processInfo.environment["NOTCHTASKS_COLLAPSEPROBE_AT"]
+            .flatMap(Double.init) ?? 0.10
+        AppDebug.log(String(format: "[probe] 1.2s 后展开，再 1.2s 后收起，在 t=%.3f 抓一帧", at))
+
+        suppressAutoCollapse = true
+        cancelCollapse()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self else { return }
+            self.expand()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                self.collapse()
+                DispatchQueue.main.asyncAfter(deadline: .now() + at) {
+                    self.captureFrame(index: 0, at: at, outDir: outDir, prefix: "collapse")
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { exit(0) }
+            }
+        }
+    }
+
+    private func captureFrame(index: Int, at t: Double, outDir: String, prefix: String = "live") {
         let v = hosting!
         let wRect = panel.frame
-        AppDebug.log(String(format: "[probe] t=%.2f 窗口=%@ 容器=%@ 形状progress=%.3f",
+        AppDebug.log(String(format: "[probe] t=%.2f 窗口=%@ 容器=%@ progress=%.3f 内容=%@",
                             t, NSStringFromRect(wRect),
-                            NSStringFromRect(v.frame), Double(ui.progress)))
+                            NSStringFromRect(v.frame), Double(ui.progress),
+                            ui.expanded ? "面板" : "把手"))
 
         guard let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
         v.cacheDisplay(in: v.bounds, to: rep)
@@ -372,7 +419,7 @@ final class NotchController {
         guard let tiff = img.tiffRepresentation,
               let out = NSBitmapImageRep(data: tiff),
               let png = out.representation(using: .png, properties: [:]) else { return }
-        let path = outDir + String(format: "/live-%02d-%.2f.png", index, t)
+        let path = outDir + String(format: "/%@-%02d-%.2f.png", prefix, index, t)
         try? png.write(to: URL(fileURLWithPath: path))
     }
 
