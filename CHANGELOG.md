@@ -3,7 +3,28 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.0.2] - 2026-10-03
+
+收起过程不再是「整块面板消失」，改成被形状从左边逐步裁掉；移开鼠标后的等待从 0.8 秒缩到 0.5 秒。
+
+### 修复
+
+- **收起时面板不再「整个消失」**：`collapse()` 一进门就把 `expanded` 翻成 false，
+  内容层瞬间从面板换成把手，屏幕上是「一块满尺寸的黑色空面板僵在那儿 0.22 秒，
+  然后啪地收掉」。现在只动画 `progress`，面板留在原地被形状从左边逐步裁掉，
+  收完再换内容、缩窗口。实测抓帧：光晕左端 29→41→71→145→193→336→396pt 单调右移
+  （形状确实在连续收缩），面板文字像素 6929→2064→734→164→27 被逐步裁掉；
+  收到一半把鼠标移回来会反向播回去，不会卡在半路
+- **收起等待 0.8s → 0.5s**，感知上约 0.7s 收干净
+
+### 工程
+
+- 新增 `NOTCHTASKS_COLLAPSEPROBE` / `NOTCHTASKS_COLLAPSEPROBE_AT`：
+  在真实窗口里抓收起过程中某一时刻的一帧，用来核对「面板是不是被逐步裁掉」。
+  刻意做成一次只抓一帧——同步渲染整棵视图树要几十毫秒，
+  在一次 0.22s 的动画里连抓多帧会把主线程占满，量到的就只剩阻塞
+- 清掉两处早前补丁重复插入的调用（`installClickMonitor()` 被装了两次，
+  靠 250ms 去重才没暴露；`NOTCHTASKS_ANIMPROBE` 挂钩也重复了一份）
 
 ## [1.0.1] - 2026-10-03
 
@@ -105,6 +126,7 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.2
 [1.0.1]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.1
 [1.0.0]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.0

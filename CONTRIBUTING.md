@@ -37,6 +37,12 @@ NOTCHTASKS_DEBUG=1 ./dist/NotchTasks.app/Contents/MacOS/NotchTasks
 # 在真实窗口里抓展开动画的帧（离屏渲染验证不了这个）
 NOTCHTASKS_DEBUG=1 NOTCHTASKS_ANIMPROBE=/tmp/live \
   ./dist/NotchTasks.app/Contents/MacOS/NotchTasks
+
+# 抓收起过程中某一时刻的一帧。一次只抓一帧、改 _AT 多跑几次——
+# 同步渲染整棵树要几十毫秒，在一次 0.22s 动画里连抓多帧会把主线程占满，
+# 动画被自己卡住，量到的就不是动画了
+NOTCHTASKS_COLLAPSEPROBE=/tmp/cp NOTCHTASKS_COLLAPSEPROBE_AT=0.10 \
+  ./dist/NotchTasks.app/Contents/MacOS/NotchTasks
 ```
 
 无 GUI 自检（CI 用的就是这些）：
@@ -79,7 +85,8 @@ scripts/
   数据来自 `TaskStore.demoItems()`——那批假任务是唯一允许出现在 docs/ 里的内容
 - 新增示例行时，路径要用 `NSHomeDirectory() + "/Projects/…"` 这类中性值，
   别硬编码真实工程目录
-- `NOTCHTASKS_ANIMPROBE` 在真实窗口里抓的帧含真实数据，只往 `/tmp` 放，不要提交
+- `NOTCHTASKS_ANIMPROBE` / `NOTCHTASKS_COLLAPSEPROBE` 在真实窗口里抓的帧含真实数据，
+  只往 `/tmp` 放，不要提交
   （`docs/live/` 已在 .gitignore 里）
 
 改完 UI 或配色，重跑 `make screenshots` 并把 `docs/` 的变化一起提交。
