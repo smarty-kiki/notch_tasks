@@ -201,7 +201,7 @@ final class TaskStore: ObservableObject {
 
     // MARK: - 查询：活跃子任务（tasks/<sessionId>/*.json）
 
-    static let tasksRoot = (NSHomeDirectory() as NSString).appendingPathComponent(".workbuddy/tasks")
+    static let tasksRoot = (UserHome.path as NSString).appendingPathComponent(".workbuddy/tasks")
 
     /// 返回 sessionId -> 当前正在做的子任务名
     private func fetchActiveTodos(_ db: OpaquePointer) -> [String: String] {
@@ -360,7 +360,7 @@ final class TaskStore: ObservableObject {
     /// 2. 时间戳由「距今多少分钟」反推，所以工作区目录名（`10-02 21:40 工作区`）
     ///    和右上角的相对时间永远自洽，不会出现「3 分钟前 / 昨天的工作区」
     private static func demoItems() -> [TaskItem] {
-        let home = NSHomeDirectory()
+        let home = UserHome.path
 
         func minutesAgo(_ m: Double) -> Date {
             Date().addingTimeInterval(-m * 60)

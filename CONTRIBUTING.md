@@ -53,6 +53,8 @@ NOTCHTASKS_COLLAPSEPROBE=/tmp/cp NOTCHTASKS_COLLAPSEPROBE_AT=0.10 \
 ./build/NotchTasks --animframes /tmp/an      # 逐帧渲染生长动画
 ./build/NotchTasks --hittest 150 90 6        # 面板内坐标 → 命中的行/底栏按钮
 ./build/NotchTasks --states                  # 状态映射表（逻辑状态 → 展示状态 + 配色）
+./build/NotchTasks --claude                  # Claude 注册表自检（原始内容 / 解析 / 进程存活）
+./build/NotchTasks --sound                   # 提示音响度自检（原版 ↔ 自带放大 的 dBFS 对比）
 ```
 
 ## 代码结构
@@ -125,6 +127,10 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
 - WorkBuddy：`~/.workbuddy/workbuddy.db` —— **从不打开原库**，每轮复制到临时目录再查，并加 `PRAGMA query_only=ON`
 - Claude Code：`~/.claude/sessions/*.json` —— 只读，不写
 
+**路径一律走 `UserHome.path`，别直接用 `NSHomeDirectory()`。** 后者在 macOS 上走
+getpwuid、**不认 `HOME` 环境变量**；而冒烟测试靠 `HOME=<临时目录>` 把数据源指开，
+用错的话那份隔离是假的 —— 测试会去读真实数据，断言假通过。这个坑真踩过。
+
 提交 PR 时请保持这个约束。
 
 **两个 `status` 字段都容易被想当然，两个坑都踩过：**
@@ -140,6 +146,10 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
     「列表里没有 CLI 会话」很可能只是没会话在跑，不是读不到
   - 列表标题要读**会话记录**里的 `ai-title`，不是注册表里的 `name`——
     后者是派生的（`kiki-2d` 这种），跟终端标签对不上
+  - 注册表文件可能**被写坏**：Claude Code 重写时若内容变短又没截断，尾部会留下残片
+    （形如 `{…完整对象…}51,"waitingFor":"permission prompt"}`）。整文件严格解析会因
+    extra data 失败，于是进程明明活着、列表里却一条都没有。读的时候必须容错
+    （括号配对、只取第一个完整对象），`--claude` 能区分「进程退了 / 被清理 / 文件写坏」
 
 遇到没见过的取值：映射按「运行中」兜底，原始值写进 `NOTCHTASKS_DEBUG` 日志，别直接显示给用户。
 

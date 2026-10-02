@@ -76,6 +76,7 @@ final class NotchController {
             .sink { [weak self] _ in self?.updateMouseEventPolicy() }
             .store(in: &cancellables)
 
+        SoundPlayer.shared.warmUp()   // 先把音频引擎起好，首声才没有延迟
         store.start()
         installGlobalMonitor()
         installClickMonitor()
@@ -512,7 +513,7 @@ final class NotchController {
             case .needConfirm: name = "Ping"
             default:           name = "Glass"
             }
-            NSSound(named: NSSound.Name(name))?.play()
+            SoundPlayer.shared.play(name)
         }
         guard prefs.notifySystem else { return }
         let title: String

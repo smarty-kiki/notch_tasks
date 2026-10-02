@@ -169,10 +169,21 @@ cd notch_tasks
 > （见 `~/.claude/.last-cleanup`）。清理后那一刻目录是空的，
 > App 自然一条 CLI 会话也列不出来，直到下一个会话注册进来。这是数据源的正常行为，
 > 不是 App 读不到。
+>
+> **另一个会让会话凭空消失的原因**：这个注册表文件会被 Claude Code 以「内容变短但不截断」
+> 的方式重写，旧内容更长时尾部会留下上一次的残片（实测见过
+> `{…完整对象…}51,"waitingFor":"permission prompt"}` 这种）。整文件严格解析遇到 extra data
+> 会直接失败，会话就静默没了。所以读取时改成括号配对、**只取第一个完整对象**，
+> 并在读到写入中途的半截内容时沿用上一轮的值，避免列表闪断。
 
 </details>
 
 ## 常见问题
+
+**列表里一个 Claude Code CLI 会话都没有？**
+有三种原因，`./build/NotchTasks --claude` 能一眼分开：进程真的退了；
+`sessions/` 被 Claude Code 按日清理过（清完那一刻是空的）；注册表文件被写坏过。
+三种都不影响 WorkBuddy 那边的显示。
 
 **打开被拦、提示"无法验证开发者"？**
 产物是 ad-hoc 签名，没有 Developer ID。右键点图标 →「打开」，或跑一次上面那条 `xattr` 命令。
@@ -310,6 +321,7 @@ make test                # 冒烟测试
 ./package.sh             # 打发布包 → dist/NotchTasks-<版本>-macos-universal.dmg + .zip
 make screenshots         # 重新生成 docs/ 下的截图（用合成数据，可安全公开）
 make icons               # 重新生成 App 图标
+make sounds              # 重新生成放大过的提示音 → Resources/Sounds/
 ```
 
 ### 无 GUI 自检
@@ -322,6 +334,8 @@ make icons               # 重新生成 App 图标
 ./build/NotchTasks --hittest 150 90 6         # 面板内坐标 → 命中的行 / 底栏按钮
 ./build/NotchTasks --preview /tmp/np --demo   # 离屏渲染各状态 PNG（--demo = 合成数据）
 ./build/NotchTasks --animframes /tmp/an       # 逐帧渲染生长动画，验证锚点
+./build/NotchTasks --claude                   # Claude 注册表：原始内容 / 解析结果 / 进程存活
+./build/NotchTasks --sound                    # 提示音响度：系统原版 ↔ 自带放大 的 dBFS 对比
 ```
 
 调试开关：
@@ -363,10 +377,12 @@ Sources/
   TaskStore.swift   轮询、查询、状态映射与跃迁检测
   NotchUI.swift     UIState / MorphPath / 形状 / 把手 / 面板
   App.swift         窗口控制器、几何与锚点、悬停与点击、通知、菜单栏
+  SoundPlayer.swift 提醒音（优先播自带的放大版，退回系统原版）
   Preview.swift     离屏渲染：静态预览 + 逐帧动画
 tools/
   make-icon.swift   App 图标生成 → Resources/AppIcon.icns + docs/logo.png
   make-strip.swift  多图横向拼接，用于生成 docs/ 的对比图
+  make-sounds.swift 把系统提示音放大后导出到 Resources/Sounds/
 scripts/
   smoke-test.sh     冒烟测试（本地和 CI 共用同一份）
   make-screenshots.sh 重新生成 docs/ 下的全部界面图
