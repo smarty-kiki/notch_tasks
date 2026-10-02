@@ -1,6 +1,15 @@
 import Foundation
 import SwiftUI
 
+/// 用户 home 目录。
+///
+/// 优先读 `HOME` 环境变量，而不是 `NSHomeDirectory()` —— 后者在 macOS 上走
+/// getpwuid，**不认 HOME**。冒烟测试靠 `HOME=<临时目录>` 把数据源指开，
+/// 用 NSHomeDirectory() 的话那个隔离是假的（会去读真实数据）。
+enum UserHome {
+    static let path: String = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
+}
+
 /// 任务状态（对外展示用）。
 ///
 /// WorkBuddy 和 Claude Code CLI 各自把自家取值映射到这一套上，

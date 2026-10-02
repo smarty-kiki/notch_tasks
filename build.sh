@@ -102,6 +102,16 @@ fi
 # 谁转发 .app / dmg，声明就跟着谁走，不会中途丢掉。
 cp -f "$ROOT/LICENSE" "$BUNDLE/Contents/Resources/LICENSE"
 
+# 放大过的提示音（tools/make-sounds.swift 生成）。
+# 系统原版峰值只有 -14 dBFS，而 NSSound 的音量 1.0 就到顶了，
+# 所以响度只能从文件本身来。缺了就退回系统原版，不至于没声。
+if [ -d "$ROOT/Resources/Sounds" ]; then
+  rm -rf "$BUNDLE/Contents/Resources/Sounds"
+  cp -R "$ROOT/Resources/Sounds" "$BUNDLE/Contents/Resources/Sounds"
+else
+  echo "   ⚠️  缺少 Resources/Sounds（跑 swift tools/make-sounds.swift 生成，会退回系统原版音效）"
+fi
+
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
                         -c "Set :CFBundleVersion $BUILD_NUMBER" \
                         "$BUNDLE/Contents/Info.plist" >/dev/null

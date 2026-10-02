@@ -1,4 +1,4 @@
-.PHONY: help build universal debug run package test preview screenshots icons notes tag clean
+.PHONY: help build universal debug run package test preview screenshots icons sounds notes tag clean
 
 help:
 	@sed -n 's/^## //p' $(MAKEFILE_LIST)
@@ -38,6 +38,10 @@ screenshots: build
 ## icons       重新生成 App 图标（改完 tools/make-icon.swift 后跑）
 icons:
 	swift tools/make-icon.swift
+
+## sounds      重新生成放大过的提示音 → Resources/Sounds/（改完 tools/make-sounds.swift 后跑）
+sounds:
+	@swift tools/make-sounds.swift
 
 ## notes       打印某个版本的 release notes（默认取 VERSION），例如 make notes V=1.0.0
 notes:

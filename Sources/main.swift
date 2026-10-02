@@ -89,6 +89,149 @@ if CommandLine.arguments.contains("--states") {
     exit(0)
 }
 
+// 提示音响度自检：NotchTasks --sound [音效名] [--play]
+//
+// 音量这种事不该靠耳朵猜：这里把「系统原版」和「app 自带的放大版」各量一遍，
+// 给出峰值与 RMS（dBFS）以及响度差。加 --play 顺带真放一遍。
+if cliArgs.contains("--sound") {
+    let names = argValue(after: "--sound").map { [$0] } ?? ["Glass", "Ping", "Basso"]
+    print("对比    : 系统原版 /System/Library/Sounds  ↔  app 自带 Resources/Sounds")
+    print("由来    : tools/make-sounds.swift 统一放大 +9.6 dB（线性 ×3.0，无损）")
+    print(String(repeating: "-", count: 78))
+    for n in names {
+        print("\(n):")
+        print(SoundPlayer.measure(n))
+    }
+    if cliArgs.contains("--play") {
+        print(String(repeating: "-", count: 78))
+        print("依次播放（听一下实际效果）：")
+        for n in names {
+            print("  ▶︎ \(n)")
+            SoundPlayer.shared.play(n)
+            Thread.sleep(forTimeInterval: 1.3)
+        }
+    }
+    exit(0)
+}
+
+// Claude 会话自检：NotchTasks --claude
+//
+// 「列表里没有 CLI 会话」有三种完全不同的原因：进程真的退了、注册表被 Claude
+// 按日清理了、或者文件被写坏导致解析失败。只看界面分不出来，这个命令把
+// 原始文件、解析结果、进程存活判断一并打出来。
+if cliArgs.contains("--claude") {
+    let fm = FileManager.default
+    let dir = ClaudeStore.sessionsDir
+    let stamp = (UserHome.path as NSString).appendingPathComponent(".claude/.last-cleanup")
+
+    print("会话目录: \(dir)")
+    if let t = try? String(contentsOfFile: stamp, encoding: .utf8) {
+        print("按日清理: \(t.trimmingCharacters(in: .whitespacesAndNewlines))")
+    } else {
+        print("按日清理: (无记录)")
+    }
+
+    let files = ((try? fm.contentsOfDirectory(atPath: dir)) ?? [])
+        .filter { $0.hasSuffix(".json") }.sorted()
+    print("文件数  : \(files.count)")
+    print(String(repeating: "-", count: 78))
+
+    for f in files {
+        let path = (dir as NSString).appendingPathComponent(f)
+        let attrs = try? fm.attributesOfItem(atPath: path)
+        let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
+        let mt = (attrs?[.modificationDate] as? Date).map { "\($0)" } ?? "-"
+        print("── \(f)  \(size) 字节  mtime=\(mt)")
+
+        guard let data = fm.contents(atPath: path) else { print("   读取失败"); continue }
+        print("   原始: \(String(data: data, encoding: .utf8) ?? "(非 UTF-8)")")
+
+        // 严格解析失败 = 文件里有 extra data（尾部残渣）或被截断，
+        // 这正是「会话明明活着却不显示」的原因
+        let strict = (try? JSONSerialization.jsonObject(with: data)) != nil
+        print("   严格解析: \(strict ? "通过（文件干净）" : "失败 → 有尾部残渣或被截断，改用括号配对取第一个对象")")
+
+        guard let obj = ClaudeStore.firstJSONObject(in: data) else {
+            print("   结果: 一个完整对象都没取到 → 这条会被跳过")
+            continue
+        }
+        let pid = (obj["pid"] as? NSNumber)?.int32Value ?? -1
+        print("   取值: pid=\(pid)"
+              + " name=\(obj["name"] as? String ?? "-")"
+              + " status=\(obj["status"] as? String ?? "-")"
+              + " waitingFor=\(obj["waitingFor"] as? String ?? "-")")
+    }
+
+    print(String(repeating: "-", count: 78))
+    let all = ClaudeStore.scan()
+    let live = all.filter { $0.alive && $0.isClaude }
+    print("scan() 读到 \(all.count) 条；其中「进程活着且是 claude」\(live.count) 条")
+    for s in all {
+        print("  pid=\(s.pid) 存活=\(s.alive ? "是" : "否") 是claude=\(s.isClaude ? "是" : "否")"
+              + " status=\(s.status) 标题=\(s.displayTitle)")
+    }
+    exit(0)
+}
+
+// Claude 会话自检：NotchTasks --claude
+//
+// 「列表里没有 CLI 会话」有三种完全不同的原因：进程真的退了、注册表被 Claude
+// 按日清理了、或者文件被写坏导致解析失败。只看界面分不出来，这个命令把
+// 原始文件、解析结果、进程存活判断一并打出来。
+if cliArgs.contains("--claude") {
+    let fm = FileManager.default
+    let dir = ClaudeStore.sessionsDir
+    let stamp = (UserHome.path as NSString).appendingPathComponent(".claude/.last-cleanup")
+
+    print("会话目录: \(dir)")
+    if let t = try? String(contentsOfFile: stamp, encoding: .utf8) {
+        print("按日清理: \(t.trimmingCharacters(in: .whitespacesAndNewlines))")
+    } else {
+        print("按日清理: (无记录)")
+    }
+
+    let files = ((try? fm.contentsOfDirectory(atPath: dir)) ?? [])
+        .filter { $0.hasSuffix(".json") }.sorted()
+    print("文件数  : \(files.count)")
+    print(String(repeating: "-", count: 78))
+
+    for f in files {
+        let path = (dir as NSString).appendingPathComponent(f)
+        let attrs = try? fm.attributesOfItem(atPath: path)
+        let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
+        let mt = (attrs?[.modificationDate] as? Date).map { "\($0)" } ?? "-"
+        print("── \(f)  \(size) 字节  mtime=\(mt)")
+
+        guard let data = fm.contents(atPath: path) else { print("   读取失败"); continue }
+        print("   原始: \(String(data: data, encoding: .utf8) ?? "(非 UTF-8)")")
+
+        // 严格解析失败 = 文件里有 extra data（尾部残渣）或被截断，
+        // 这正是「会话明明活着却不显示」的原因
+        let strict = (try? JSONSerialization.jsonObject(with: data)) != nil
+        print("   严格解析: \(strict ? "通过（文件干净）" : "失败 → 有尾部残渣或被截断，改用括号配对取第一个对象")")
+
+        guard let obj = ClaudeStore.firstJSONObject(in: data) else {
+            print("   结果: 一个完整对象都没取到 → 这条会被跳过")
+            continue
+        }
+        let pid = (obj["pid"] as? NSNumber)?.int32Value ?? -1
+        print("   取值: pid=\(pid)"
+              + " name=\(obj["name"] as? String ?? "-")"
+              + " status=\(obj["status"] as? String ?? "-")"
+              + " waitingFor=\(obj["waitingFor"] as? String ?? "-")")
+    }
+
+    print(String(repeating: "-", count: 78))
+    let all = ClaudeStore.scan()
+    let live = all.filter { $0.alive && $0.isClaude }
+    print("scan() 读到 \(all.count) 条；其中「进程活着且是 claude」\(live.count) 条")
+    for s in all {
+        print("  pid=\(s.pid) 存活=\(s.alive ? "是" : "否") 是claude=\(s.isClaude ? "是" : "否")"
+              + " status=\(s.status) 标题=\(s.displayTitle)")
+    }
+    exit(0)
+}
+
 // 无 GUI 自检：NotchTasks --dump  打印当前读取到的任务后退出
 if CommandLine.arguments.contains("--dump") {
     let store = TaskStore()

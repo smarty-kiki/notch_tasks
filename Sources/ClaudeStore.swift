@@ -50,8 +50,8 @@ struct ClaudeSession {
 ///    会随会话推进反复重写（所以从文件尾部往前找最近的一条即可）。
 enum ClaudeStore {
 
-    static let sessionsDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/sessions")
-    static let projectsDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/projects")
+    static let sessionsDir = (UserHome.path as NSString).appendingPathComponent(".claude/sessions")
+    static let projectsDir = (UserHome.path as NSString).appendingPathComponent(".claude/projects")
 
     /// 从记录尾部往回找多少字节；标题会反复重写，尾部几乎总能命中
     private static let tailBytes = 256 * 1024
@@ -61,6 +61,11 @@ enum ClaudeStore {
     /// 记录文件 → 上次解析结果。轮询每 2 秒跑一次，靠它避免反复读同一条记录
     private static var titleCache: [String: (mtime: Date, size: Int, title: String?)] = [:]
 
+    /// 注册表文件 → 上次解析成功的内容。
+    /// 轮询正好撞上 Claude 写文件的瞬间时，会读到半截内容；这时沿用上一轮的值，
+    /// 免得列表里的 CLI 行随每次写入闪断（下一轮就会刷新）。
+    private static var lastGood: [String: [String: Any]] = [:]
+
     static func scan() -> [ClaudeSession] {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(atPath: sessionsDir) else { return [] }
@@ -69,12 +74,26 @@ enum ClaudeStore {
         let projectDirs = ((try? fm.contentsOfDirectory(atPath: projectsDir)) ?? [])
             .map { (projectsDir as NSString).appendingPathComponent($0) }
 
+        // 会话文件被 Claude 按日清理掉之后，对应的缓存也丢掉
+        let alive = Set(files)
+        lastGood = lastGood.filter { alive.contains(($0.key as NSString).lastPathComponent) }
+
         var out: [ClaudeSession] = []
         for f in files where f.hasSuffix(".json") {
             let path = (sessionsDir as NSString).appendingPathComponent(f)
-            guard let data = fm.contents(atPath: path),
-                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { continue }
+            guard let data = fm.contents(atPath: path) else { continue }
+
+            // 文件可能带尾部残片（见 firstJSONObject），也可能正好被读到写入中途
+            let parsed = firstJSONObject(in: data)
+            if let parsed = parsed {
+                lastGood[path] = parsed
+            } else {
+                AppDebug.log("[claude] \(f) 未解析出完整 JSON（\(data.count) 字节），沿用上一轮的值")
+            }
+            guard let obj = parsed ?? lastGood[path] else {
+                AppDebug.log("[claude] 跳过无法解析的会话文件: \(f)")
+                continue
+            }
 
             let pidFromName = pid_t(f.replacingOccurrences(of: ".json", with: "")) ?? -1
             let pid = (obj["pid"] as? NSNumber)?.int32Value ?? pidFromName
@@ -104,6 +123,56 @@ enum ClaudeStore {
                 isClaude: executablePath(pid)?.contains("claude") ?? false))
         }
         return out
+    }
+
+    /// 从注册表文件里取出**第一个完整的 JSON 对象**。
+    ///
+    /// 为什么不能只用 `JSONSerialization`：Claude Code 重写这个文件时存在
+    /// 「内容变短但不截断」的竞态，旧内容更长时会在尾部留下上一次的残片，例如
+    ///
+    ///     {...完整对象...}51,"waitingFor":"permission prompt"}
+    ///
+    /// 这种 extra data 会让 `JSONSerialization` 直接抛错。原来用 `try?` 一包，
+    /// 整条会话就被静默丢掉了 —— 现象是**进程明明活着、`sessions/` 里也有文件，
+    /// 列表里却一个 CLI 会话都不显示**。这里做一次括号配对扫描，只截出第一个对象。
+    ///
+    /// 扫描时跟踪「是否在字符串内」和转义，避免把字符串里的花括号当成结构。
+    static func firstJSONObject(in data: Data) -> [String: Any]? {
+        // 绝大多数文件是干净的，先按原样解析一次，省掉扫描
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return obj
+        }
+
+        let bytes = [UInt8](data)
+        var start = -1          // 第一个 `{` 的下标
+        var depth = 0
+        var inString = false
+        var escaped = false
+
+        for (i, b) in bytes.enumerated() {
+            if inString {
+                if escaped { escaped = false }
+                else if b == 0x5C { escaped = true }      // 反斜杠
+                else if b == 0x22 { inString = false }    // 引号
+                continue
+            }
+            switch b {
+            case 0x22:                                // "
+                inString = true
+            case 0x7B:                                // {
+                if start < 0 { start = i }
+                depth += 1
+            case 0x7D:                                // }
+                depth -= 1
+                if depth == 0, start >= 0 {
+                    let slice = Data(bytes[start...i])
+                    return try? JSONSerialization.jsonObject(with: slice) as? [String: Any]
+                }
+            default:
+                break
+            }
+        }
+        return nil
     }
 
     /// 还活着的 claude 会话

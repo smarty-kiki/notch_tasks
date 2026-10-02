@@ -6,10 +6,11 @@
 #
 # 不用起 GUI，也不需要你本机的 WorkBuddy / Claude 数据。检查：
 #   1. 数据源全缺时也不崩
-#   2. 状态映射（展示状态 + 配色）符合预期
-#   3. 点击命中映射正确
-#   4. 各状态离屏渲染都能出图、且画布尺寸符合布局常量
-#   5. 生长动画逐帧都能出图
+#   2. Claude 注册表被写坏（尾部残渣）时仍能解析出会话
+#   3. 状态映射（展示状态 + 配色）符合预期
+#   4. 点击命中映射正确
+#   5. 各状态离屏渲染都能出图、且画布尺寸符合布局常量
+#   6. 生长动画逐帧都能出图
 #
 set -euo pipefail
 
@@ -28,13 +29,42 @@ fail() { echo "   ✗ $*" >&2; exit 1; }
 ok()   { echo "   ✓ $*"; }
 
 # ---------------------------------------------------------------- 1
-echo "== 1/5 数据源缺失时不崩"
+echo "== 1/6 数据源缺失时不崩"
 HOME="$TMP/empty-home" "$BIN" --dump > "$TMP/dump.txt" || fail "--dump 退出码非 0"
 grep -q "读取时间" "$TMP/dump.txt" || fail "--dump 输出不完整"
 ok "--dump 正常输出"
 
 # ---------------------------------------------------------------- 2
-echo "== 2/5 状态映射（WorkBuddy 与 Claude CLI 统一到同一套）"
+echo "== 2/6 Claude 注册表被写坏时仍能解析出会话"
+# Claude Code 重写 sessions/<pid>.json 时存在「内容变短但不截断」的竞态：
+# 旧内容更长时，文件尾部会留下上一次写下的残片，例如
+#     {...完整的对象...}51,"waitingFor":"permission prompt"}
+# 严格 JSON 解析遇到这种 extra data 会直接报错。曾经用 `try?` 一包，
+# 整条会话就被静默丢掉了 —— 现象是进程活得好好的、sessions/ 里也有文件，
+# 列表里却一个 CLI 会话都没有。这条用例就是钉住那个修复。
+FAKE_HOME="$TMP/fake-home"
+mkdir -p "$FAKE_HOME/.claude/sessions"
+cat > "$FAKE_HOME/.claude/sessions/12345.json" <<'JSON'
+{"pid":12345,"sessionId":"00000000-0000-0000-0000-000000000000","cwd":"/tmp/demo","name":"demo-1","status":"waiting","updatedAt":1790962853751,"statusUpdatedAt":1790962853751}51,"waitingFor":"permission prompt"}
+JSON
+
+CLI_OUT="$(HOME="$FAKE_HOME" "$BIN" --claude)"
+printf '%s\n' "$CLI_OUT" | grep -q "严格解析: 失败" \
+  || fail "带残渣的文件竟被严格解析通过了，这条用例已失效"
+printf '%s\n' "$CLI_OUT" | grep -q "取值: pid=12345 name=demo-1 status=waiting" \
+  || fail "带尾部残渣的注册表没能解析出字段"
+ok "带尾部残渣 → 仍解析出 pid=12345 / waiting"
+
+# 干净文件也必须照常通过（别为了容错把正常路径弄坏）
+cat > "$FAKE_HOME/.claude/sessions/22222.json" <<'JSON'
+{"pid":22222,"sessionId":"11111111-1111-1111-1111-111111111111","cwd":"/tmp/demo2","name":"demo-2","status":"busy","updatedAt":1790962853751}
+JSON
+printf '%s\n' "$(HOME="$FAKE_HOME" "$BIN" --claude)" | grep -q "取值: pid=22222 name=demo-2 status=busy" \
+  || fail "干净的注册表解析失败"
+ok "干净注册表照常解析"
+
+# ---------------------------------------------------------------- 3
+echo "== 3/6 状态映射（WorkBuddy 与 Claude CLI 统一到同一套）"
 # 「展示状态 + 配色」是列表上唯一可见的东西，锁死它，
 # 免得以后改映射时把「刚完成」和「早就完成」又混回去
 STATES="$("$BIN" --states)"
@@ -58,7 +88,7 @@ assert_state "完成 11 分钟"        "已完成" "#6B9EB8"   # 沉成灰蓝
 assert_state "完成但有未读"        "待确认" "#FF9E0A"
 
 # ---------------------------------------------------------------- 3
-echo "== 3/5 点击命中映射"
+echo "== 4/6 点击命中映射"
 # 面板内坐标（左上原点）：留白 44，行区从 44+35 开始，每行 49，底栏 43
 assert_hit() {
   local got
@@ -77,7 +107,7 @@ assert_hit  10  120 6 "none"       # 左侧留白内
 assert_hit 150   10 6 "none"       # 顶部留白内
 
 # ---------------------------------------------------------------- 3
-echo "== 4/5 离屏渲染"
+echo "== 5/6 离屏渲染"
 # 画布 = 窗口尺寸，由布局常量决定：
 #   收起 = 把手 32×68 + 左右留白，展开 = 面板 420 宽 + 左侧留白 44
 # 改 Sources/NotchUI.swift 里的常量时，同步改这里
@@ -119,7 +149,7 @@ for name, (ew, eh) in checks.items():
 PY
 
 # ---------------------------------------------------------------- 4
-echo "== 5/5 生长动画逐帧"
+echo "== 6/6 生长动画逐帧"
 HOME="$TMP/empty-home" "$BIN" --animframes "$TMP/anim" > /dev/null || fail "--animframes 退出码非 0"
 count="$(find "$TMP/anim" -name '*.png' | wc -l | tr -d ' ')"
 [ "$count" -ge 6 ] || fail "只生成了 $count 帧"

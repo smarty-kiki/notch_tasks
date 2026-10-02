@@ -13,7 +13,7 @@ final class WorkBuddyDB {
         if let custom = UserDefaults.standard.string(forKey: "dbPath"), !custom.isEmpty {
             return (custom as NSString).expandingTildeInPath
         }
-        return (NSHomeDirectory() as NSString).appendingPathComponent(".workbuddy/workbuddy.db")
+        return (UserHome.path as NSString).appendingPathComponent(".workbuddy/workbuddy.db")
     }()
 
     private let scratch = FileManager.default.temporaryDirectory
