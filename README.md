@@ -9,14 +9,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OWNER/agent_task_hub/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/OWNER/agent_task_hub/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/OWNER/agent_task_hub/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/OWNER/agent_task_hub?display_name=tag&sort=semver"></a>
+  <a href="https://github.com/OWNER/notch_tasks/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/OWNER/notch_tasks/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/OWNER/notch_tasks/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/OWNER/notch_tasks?display_name=tag&sort=semver"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-black">
   <img alt="Universal" src="https://img.shields.io/badge/arch-arm64%20%7C%20x86__64-blue">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
 </p>
 
-> 仓库名是 `agent_task_hub`，产物和应用名是 `NotchTasks` /「任务坞」。
+> 仓库名是 `notch_tasks`，产物和应用名是 `NotchTasks` /「任务坞」。
 
 鼠标停到屏幕右边缘靠上的把手，面板向左展开；有任务**完成**或**待确认**时，
 把手会亮起脉冲描边 + 光晕 + 角标，并可选地响一声、发一条系统通知。
@@ -28,7 +28,7 @@
 
 ## 安装
 
-**下载现成的**：到 [Releases](https://github.com/OWNER/agent_task_hub/releases/latest) 下载
+**下载现成的**：到 [Releases](https://github.com/OWNER/notch_tasks/releases/latest) 下载
 `NotchTasks-<版本>-macos-universal.zip`，解压把 `NotchTasks.app` 拖进「应用程序」。
 
 首次打开会被 Gatekeeper 拦（产物是 ad-hoc 签名，没有 Developer ID），
@@ -41,8 +41,8 @@ xattr -dr com.apple.quarantine /Applications/NotchTasks.app
 **自己编**：
 
 ```bash
-git clone https://github.com/OWNER/agent_task_hub.git
-cd agent_task_hub
+git clone https://github.com/OWNER/notch_tasks.git
+cd notch_tasks
 ./run.sh
 ```
 

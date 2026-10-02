@@ -343,14 +343,16 @@ final class TaskStore: ObservableObject {
 
     private static func demoClaudeItems() -> [TaskItem] {
         let now = Date()
+        // 路径要中性：这些示例行会被渲染进 docs/ 的预览图，仓库是公开的
+        let home = NSHomeDirectory()
         return [
-            TaskItem(id: "demo-1", kind: .claude, title: "crewup-api-ef",
+            TaskItem(id: "demo-1", kind: .claude, title: "example-api-ef",
                      detail: "正在执行",
-                     cwd: "/Users/yaoyang/Developments.localized/company/crewup/crewup_api",
+                     cwd: home + "/Projects/example_api",
                      state: .running, updatedAt: now.addingTimeInterval(-40)),
-            TaskItem(id: "demo-2", kind: .claude, title: "laya-server-1e",
+            TaskItem(id: "demo-2", kind: .claude, title: "example-server-1e",
                      detail: "等你输入",
-                     cwd: "/Users/yaoyang/Developments.localized/company/smarty/laya_server",
+                     cwd: home + "/Projects/example_server",
                      state: .idle, updatedAt: now.addingTimeInterval(-600)),
         ]
     }

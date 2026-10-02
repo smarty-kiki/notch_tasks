@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: 使用问题 / 讨论
-    url: https://github.com/OWNER/agent_task_hub/discussions
+    url: https://github.com/OWNER/notch_tasks/discussions
     about: 装不上、想问怎么用，去 Discussions 更合适
