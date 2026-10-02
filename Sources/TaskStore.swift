@@ -17,8 +17,10 @@ final class TaskStore: ObservableObject {
 
     // 设置
     @Published var maxRows: Int = 6
-    /// 预览用：塞两条假的 CLI 行，方便看版式（实时运行永远为 false）
-    var demoClaude: Bool = false
+    /// 合成数据模式：完全不读本机数据，只产出 `demoItems()` 里那批假任务。
+    /// 文档截图（docs/）就是它渲染的——仓库公开，所以标题与路径都必须是假的。
+    /// 实时运行永远是 false。
+    var demoData = false
     @Published var interval: TimeInterval = 2.0
     @Published var showFinished: Bool = true
 
@@ -110,17 +112,26 @@ final class TaskStore: ObservableObject {
         refreshInFlight = true
         defer { refreshInFlight = false }
 
-        guard let handle = db.open() else {
-            isLive = false
-            statusText = db.lastError ?? "读取失败"
-            return
-        }
-        defer { sqlite3_close(handle) }
+        var items: [TaskItem]
 
-        let todos = fetchActiveTodos(handle)
-        var items = fetchSessions(handle, todos: todos)
-        items.append(contentsOf: fetchAutomationRuns(handle))
-        items.append(contentsOf: fetchClaudeSessions())
+        if demoData {
+            // 预览 / 截图：不打开数据库，也不扫 ~/.claude
+            items = Self.demoItems()
+            isLive = true
+            lastRefresh = Date()
+        } else {
+            guard let handle = db.open() else {
+                isLive = false
+                statusText = db.lastError ?? "读取失败"
+                return
+            }
+            defer { sqlite3_close(handle) }
+
+            let todos = fetchActiveTodos(handle)
+            items = fetchSessions(handle, todos: todos)
+            items.append(contentsOf: fetchAutomationRuns(handle))
+            items.append(contentsOf: fetchClaudeSessions())
+        }
 
         let historyCutoff = Date().addingTimeInterval(-historyWindow)
         items.removeAll { !$0.state.isActive && $0.updatedAt < historyCutoff }
@@ -291,7 +302,6 @@ final class TaskStore: ObservableObject {
     // MARK: - 查询：终端里的 Claude Code CLI
 
     private func fetchClaudeSessions() -> [TaskItem] {
-        if demoClaude { return Self.demoClaudeItems() }
         return ClaudeStore.liveSessions().map { s in
             // Claude Code 的 status 已知取值：busy / idle / waiting，
             // 和 WorkBuddy 那边的映射对齐（同一个词 = 同一件事）：
@@ -341,19 +351,72 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    private static func demoClaudeItems() -> [TaskItem] {
-        let now = Date()
-        // 路径要中性：这些示例行会被渲染进 docs/ 的预览图，仓库是公开的
+    // MARK: - 合成数据（预览 / 文档截图）
+
+    /// 一批覆盖全部展示状态的假任务，`demoData = true` 时用它替掉真实数据源。
+    ///
+    /// 两条硬约束：
+    /// 1. **不读本机任何东西**——它会渲染进 docs/ 的图，仓库是公开的
+    /// 2. 时间戳由「距今多少分钟」反推，所以工作区目录名（`10-02 21:40 工作区`）
+    ///    和右上角的相对时间永远自洽，不会出现「3 分钟前 / 昨天的工作区」
+    private static func demoItems() -> [TaskItem] {
         let home = NSHomeDirectory()
+
+        func minutesAgo(_ m: Double) -> Date {
+            Date().addingTimeInterval(-m * 60)
+        }
+        /// 造一个和 WorkBuddy 真实形态一致的时间戳工作区路径
+        func workspace(_ m: Double) -> String {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd-HH-mm-ss"
+            return home + "/WorkBuddy/" + f.string(from: minutesAgo(m))
+        }
+
         return [
-            TaskItem(id: "demo-1", kind: .claude, title: "example-api-ef",
+            TaskItem(id: "demo-s1", kind: .session,
+                     title: "重构订单结算流程",
+                     detail: "正在：拆分结算服务与优惠券逻辑",
+                     cwd: workspace(0.4),
+                     state: .running, updatedAt: minutesAgo(0.4)),
+
+            TaskItem(id: "demo-s2", kind: .session,
+                     title: "生成季度数据报表",
+                     detail: "等你确认",
+                     cwd: workspace(4),
+                     state: .needConfirm, updatedAt: minutesAgo(4),
+                     needsConfirm: true),
+
+            TaskItem(id: "demo-c1", kind: .claude,
+                     title: "example-api-ef",
                      detail: "正在执行",
                      cwd: home + "/Projects/example_api",
-                     state: .running, updatedAt: now.addingTimeInterval(-40)),
-            TaskItem(id: "demo-2", kind: .claude, title: "example-server-1e",
+                     state: .running, updatedAt: minutesAgo(0.8)),
+
+            // 刚结束 6 分钟 → 展示成「空闲」（明亮绿）
+            TaskItem(id: "demo-s3", kind: .session,
+                     title: "补充结算流程的单元测试",
+                     detail: nil,
+                     cwd: workspace(6),
+                     state: .done, updatedAt: minutesAgo(6)),
+
+            TaskItem(id: "demo-c2", kind: .claude,
+                     title: "example-server-1e",
                      detail: "等你输入",
                      cwd: home + "/Projects/example_server",
-                     state: .idle, updatedAt: now.addingTimeInterval(-600)),
+                     state: .idle, updatedAt: minutesAgo(13)),
+
+            // 结束 1.5 小时 → 沉成「已完成」（灰蓝）
+            TaskItem(id: "demo-s4", kind: .session,
+                     title: "整理发布检查清单",
+                     detail: nil,
+                     cwd: workspace(95),
+                     state: .done, updatedAt: minutesAgo(95)),
+
+            TaskItem(id: "demo-a1", kind: .automation,
+                     title: "每日构建巡检",
+                     detail: "检查 main 分支的构建与冒烟测试",
+                     cwd: workspace(200),
+                     state: .done, updatedAt: minutesAgo(200)),
         ]
     }
 

@@ -3,21 +3,30 @@ import SwiftUI
 
 let _ = NSApplication.shared
 
-// 离屏渲染预览：NotchTasks --preview <输出目录>
-if let idx = CommandLine.arguments.firstIndex(of: "--preview") {
-    let out = CommandLine.arguments.count > idx + 1
-        ? CommandLine.arguments[idx + 1]
-        : "/tmp/notchtasks-preview"
-    MainActor.assumeIsolated { PreviewRunner.run(outDir: out) }
+let cliArgs = CommandLine.arguments
+
+/// 取 `--flag` 后面紧跟的值（下一个以 -- 开头就当作没给）
+func argValue(after flag: String) -> String? {
+    guard let i = cliArgs.firstIndex(of: flag), i + 1 < cliArgs.count else { return nil }
+    let v = cliArgs[i + 1]
+    return v.hasPrefix("--") ? nil : v
+}
+
+/// `--demo`：渲染时用合成任务替掉真实数据源。docs/ 的截图走这条，
+/// 保证公开仓库里的图不含本机任务标题与路径。
+let demoRendering = cliArgs.contains("--demo")
+
+// 离屏渲染预览：NotchTasks --preview <输出目录> [--demo]
+if cliArgs.contains("--preview") {
+    let out = argValue(after: "--preview") ?? "/tmp/notchtasks-preview"
+    MainActor.assumeIsolated { PreviewRunner.run(outDir: out, demo: demoRendering) }
     exit(0)
 }
 
-// 逐帧渲染生长动画：NotchTasks --animframes <输出目录>
-if let idx = CommandLine.arguments.firstIndex(of: "--animframes") {
-    let out = CommandLine.arguments.count > idx + 1
-        ? CommandLine.arguments[idx + 1]
-        : "/tmp/notchtasks-anim"
-    MainActor.assumeIsolated { PreviewRunner.animFrames(outDir: out) }
+// 逐帧渲染生长动画：NotchTasks --animframes <输出目录> [--demo]
+if cliArgs.contains("--animframes") {
+    let out = argValue(after: "--animframes") ?? "/tmp/notchtasks-anim"
+    MainActor.assumeIsolated { PreviewRunner.animFrames(outDir: out, demo: demoRendering) }
     exit(0)
 }
 

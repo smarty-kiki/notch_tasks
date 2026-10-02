@@ -21,5 +21,9 @@ xcuserdata/
 # 本地临时
 /tmp-preview/
 
+# 真实窗口里抓的动画帧（NOTCHTASKS_ANIMPROBE），含本机真实任务，不要提交
+docs/live/
+notes.md
+
 # sed -i 在 BSD 上的残留临时文件
 .!*!*

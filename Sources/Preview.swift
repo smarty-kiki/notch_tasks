@@ -2,11 +2,14 @@ import SwiftUI
 import AppKit
 
 /// 离屏渲染自检：不需要屏幕录制权限，直接把界面渲染成 PNG。
-/// 用法：NotchTasks --preview /tmp/notchtasks-preview
+///
+/// 用法：
+///   NotchTasks --preview <输出目录>            用本机真实数据
+///   NotchTasks --preview <输出目录> --demo     用合成数据（docs/ 的截图走这条）
 enum PreviewRunner {
 
     @MainActor
-    static func run(outDir: String) {
+    static func run(outDir: String, demo: Bool = false) {
         let fm = FileManager.default
         try? fm.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
@@ -15,7 +18,7 @@ enum PreviewRunner {
         // ---- 正常状态（有任务在跑） ----
         let store = TaskStore()
         store.maxRows = 6
-        store.demoClaude = true          // 预览里固定塞两条 CLI 行，便于看版式
+        store.demoData = demo             // demo = 只渲染合成任务，不读本机任何东西
         store.refresh()
 
         let ui = UIState()
@@ -78,13 +81,14 @@ enum PreviewRunner {
     /// 逐帧渲染生长动画：progress 是显式插值的，所以可以离屏精确复现中间帧，
     /// 用来验证形状确实是从把手那一点长出来的（右上角坐标全程不变）
     @MainActor
-    static func animFrames(outDir: String) {
+    static func animFrames(outDir: String, demo: Bool = false) {
         let fm = FileManager.default
         try? fm.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
         let prefs = Preferences()
         let store = TaskStore()
         store.maxRows = 6
+        store.demoData = demo
         store.refresh()
 
         let ui = UIState()
