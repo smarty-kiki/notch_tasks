@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-03
+
+列表里的 CLI 任务改用 Claude 自己起的会话标题，和 iTerm2 标签页对得上。
+
 ### 新增
 
 - **CLI 任务行改用 Claude 自己起的会话标题**：以前显示的是注册表里的派生名
@@ -101,5 +105,6 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.1
 [1.0.0]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.0
