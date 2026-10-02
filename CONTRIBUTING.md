@@ -198,6 +198,8 @@ git push origin vX.Y.Z
 
 ### 首次发布：把仓库推上 GitHub
 
+> 本仓库已经用 `smarty-kiki` 走完这一步，地址是 https://github.com/smarty-kiki/notch_tasks 。下面是留档，从别处 fork 出独立项目时同样适用。
+
 先把占位的仓库地址换成真实用户名（README 的徽章与下载链接、CHANGELOG 的版本对比链接、
 issue 模板里的 Discussions 链接都用了 `OWNER`）：
 

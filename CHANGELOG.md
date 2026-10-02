@@ -88,5 +88,5 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/OWNER/notch_tasks/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/OWNER/notch_tasks/releases/tag/v1.0.0
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.0

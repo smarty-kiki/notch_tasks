@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OWNER/notch_tasks/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/OWNER/notch_tasks/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/OWNER/notch_tasks/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/OWNER/notch_tasks?display_name=tag&sort=semver"></a>
+  <a href="https://github.com/smarty-kiki/notch_tasks/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/smarty-kiki/notch_tasks/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/smarty-kiki/notch_tasks/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/smarty-kiki/notch_tasks?display_name=tag&sort=semver"></a>
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-black">
   <img alt="Universal" src="https://img.shields.io/badge/arch-arm64%20%7C%20x86__64-blue">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
@@ -47,7 +47,7 @@
 
 ## 安装
 
-**下载现成的**：到 [Releases](https://github.com/OWNER/notch_tasks/releases/latest) 下载
+**下载现成的**：到 [Releases](https://github.com/smarty-kiki/notch_tasks/releases/latest) 下载
 `NotchTasks-<版本>-macos-universal.dmg`，打开后把 `NotchTasks.app` 拖进「应用程序」。
 
 不想用 dmg 的可以下 `.zip`，解压即用。两个包旁边都有 `.sha256` 可以校验：
@@ -72,7 +72,7 @@ xattr -dr com.apple.quarantine /Applications/NotchTasks.app
 **自己编**：只要装了 Xcode 或 Command Line Tools 就行，不需要别的依赖。
 
 ```bash
-git clone https://github.com/OWNER/notch_tasks.git
+git clone https://github.com/smarty-kiki/notch_tasks.git
 cd notch_tasks
 ./run.sh                 # 编译并启动
 ```
