@@ -193,16 +193,31 @@ git push origin vX.Y.Z
 
 也可以在 Actions 页面手动触发 `Release`，填版本号即可（不需要先有标签）。
 
-### 首次发布
+### 首次发布：把仓库推上 GitHub
 
-仓库第一次推到 GitHub 时还没有远端：
+先把占位的仓库地址换成真实用户名（README 的徽章与下载链接、CHANGELOG 的版本对比链接、
+issue 模板里的 Discussions 链接都用了 `OWNER`）：
 
 ```bash
-sed -i '' 's|OWNER/notch_tasks|<你的用户名>/notch_tasks|g' README.md CHANGELOG.md \
-  .github/ISSUE_TEMPLATE/config.yml
+sed -i '' 's|OWNER/notch_tasks|<你的用户名>/notch_tasks|g' \
+  README.md CHANGELOG.md .github/ISSUE_TEMPLATE/config.yml
 git commit -am "docs: 填上仓库地址"
+```
+
+**装了 `gh`**（推荐）：
+
+```bash
 gh repo create notch_tasks --public --source=. --remote=origin --push
 ```
+
+**没装 `gh`**：在网页上新建空仓库，然后接上远端再推：
+
+```bash
+git remote add origin git@github.com:<你的用户名>/notch_tasks.git
+git push -u origin main
+```
+
+推完记得去仓库设置里把 **About → Topics** 和描述填一下，issue / PR 模板会自动生效。
 
 ### 发布前自查
 
