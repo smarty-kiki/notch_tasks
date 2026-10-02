@@ -3,7 +3,9 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.0.2] - 2026-10-03
+
+收起过程不再是「整块面板消失」，改成被形状从左边逐步裁掉；移开鼠标后的等待从 0.8 秒缩到 0.5 秒。
 
 ### 修复
 
@@ -124,6 +126,7 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.2
 [1.0.1]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.1
 [1.0.0]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.0
