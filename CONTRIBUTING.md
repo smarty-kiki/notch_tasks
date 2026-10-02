@@ -42,7 +42,7 @@ NOTCHTASKS_DEBUG=1 NOTCHTASKS_ANIMPROBE=/tmp/live \
 
 ```bash
 ./build/NotchTasks --dump                    # 打印当前读到的任务
-./build/NotchTasks --preview /tmp/np         # 离屏渲染各状态 PNG
+./build/NotchTasks --preview /tmp/np --demo  # 离屏渲染各状态 PNG（--demo = 合成数据）
 ./build/NotchTasks --animframes /tmp/an      # 逐帧渲染生长动画
 ./build/NotchTasks --hittest 150 90 6        # 面板内坐标 → 命中的行/底栏按钮
 ./build/NotchTasks --states                  # 状态映射表（逻辑状态 → 展示状态 + 配色）
@@ -60,8 +60,27 @@ Sources/
   NotchUI.swift     UIState / MorphPath / 形状 / 把手 / 面板
   App.swift         窗口控制器、几何与锚点、悬停与点击、通知、菜单栏
   Preview.swift     离屏渲染：静态预览 + 逐帧动画
-tools/make-icon.swift   App 图标生成（改完重跑，产出 Resources/AppIcon.icns）
+tools/
+  make-icon.swift    App 图标生成（改完重跑，产出 Resources/AppIcon.icns + docs/logo.png）
+  make-strip.swift   多图横向拼接，生成 docs/ 里的对比图
+scripts/
+  smoke-test.sh       冒烟测试
+  make-screenshots.sh 重新生成 docs/ 下全部界面图（用合成数据）
+  release-notes.sh    从 CHANGELOG.md 抽某版本的段落，当 Release 正文
 ```
+
+### docs/ 里的截图必须是合成数据
+
+`docs/` 会被 README 引用、随仓库公开，所以**不能**把本机真实任务标题与路径渲染进去：
+
+- 截图一律走 `./scripts/make-screenshots.sh`，它给预览加 `--demo`，
+  数据来自 `TaskStore.demoItems()`——那批假任务是唯一允许出现在 docs/ 里的内容
+- 新增示例行时，路径要用 `NSHomeDirectory() + "/Projects/…"` 这类中性值，
+  别硬编码真实工程目录
+- `NOTCHTASKS_ANIMPROBE` 在真实窗口里抓的帧含真实数据，只往 `/tmp` 放，不要提交
+  （`docs/live/` 已在 .gitignore 里）
+
+改完 UI 或配色，重跑 `make screenshots` 并把 `docs/` 的变化一起提交。
 
 ## 改 UI 前必读的三个坑
 
@@ -126,8 +145,10 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
 
 ## 提交信息
 
-用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 风格，
-release notes 会自动按类型归类：
+用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 风格。
+注意 release notes **不是**自动生成的——`release.yml` 取的是 `CHANGELOG.md` 里
+对应版本的段落（见 `scripts/release-notes.sh`），所以提交信息按类型分好，
+归纳 CHANGELOG 时省事：
 
 ```
 feat: 把手支持显示 Claude Code CLI 会话
@@ -140,23 +161,62 @@ chore: 升级 CI runner
 
 1. Fork 并开一个分支：`fix/xxx` 或 `feat/xxx`
 2. 改完跑 `make test`，本地再跑一次 `./run.sh` 肉眼确认
-3. 涉及界面改动的，跑 `make preview` 并把 `docs/preview/` 的变化一并提交
+3. 涉及界面改动的，跑 `make screenshots` 并把 `docs/` 的变化一并提交
+   （它用合成数据渲染，不会把你的真实任务标题带进仓库）
 4. 提 PR，描述里写清「改了什么 / 为什么 / 怎么验证的」
 
 CI 会跑构建 + 冒烟测试 + 通用二进制编译，全绿才会合。
 
 ## 发版
 
-维护者操作：
+维护者操作，标准流程是「改版本 → 提 PR → 合并 → 打标签」，标签推上去由
+`release.yml` 自动打包并创建 Release：
 
 ```bash
-# 1. 更新 VERSION 和 CHANGELOG.md，提交
-# 2. 打标签并推上去，Release 工作流会自动打包并创建 Release
-git tag v1.0.0
-git push origin v1.0.0
+# 1. 定版本：改 VERSION，把 CHANGELOG.md 里的 [Unreleased] 整理成 [x.y.z] - 日期
+$EDITOR VERSION CHANGELOG.md
+./scripts/release-notes.sh x.y.z        # 先看一眼 Release 正文长什么样
+
+# 2. 走正常 PR 流程合进 main（CI 必须全绿）
+
+# 3. 合并后打标签并推送
+make tag            # 按 VERSION 打 vX.Y.Z 注解标签，不推送
+git push origin vX.Y.Z
 ```
 
-也可以在 Actions 页面手动触发 `Release` 工作流，填版本号即可。
+推完标签，Actions 里的 `Release` 工作流会：
 
-Release 产物是 `NotchTasks-<版本>-macos-universal.zip` 加一个 `.sha256`。
+1. 从标签解析版本号，写回 `VERSION`
+2. `./package.sh` 构建通用二进制并打 zip + `.sha256`
+3. 跑一遍冒烟测试
+4. 用 `CHANGELOG.md` 里该版本的段落作为 Release 正文，把 zip 与校验文件挂上去
+
+也可以在 Actions 页面手动触发 `Release`，填版本号即可（不需要先有标签）。
+
+### 首次发布
+
+仓库第一次推到 GitHub 时还没有远端：
+
+```bash
+sed -i '' 's|OWNER/notch_tasks|<你的用户名>/notch_tasks|g' README.md CHANGELOG.md \
+  .github/ISSUE_TEMPLATE/config.yml
+git commit -am "docs: 填上仓库地址"
+gh repo create notch_tasks --public --source=. --remote=origin --push
+```
+
+### 发布前自查
+
+- [ ] `make test` 全绿
+- [ ] `make screenshots` 后 `docs/` 没有意外变化（也不该出现真实任务标题）
+- [ ] `VERSION` 与 `CHANGELOG.md` 的版本号一致，日期是今天
+- [ ] `CHANGELOG.md` 里没有残留的 `[Unreleased]` 条目
+- [ ] LICENSE 的版权人写的是你自己想要的名字
+- [ ] README / CHANGELOG / issue 模板里的 `OWNER` 都换成了真实用户名
+
+### 发布产物
+
+`NotchTasks-<版本>-macos-universal.zip` 加一个 `.sha256`。
+
 注意是 **ad-hoc 签名**，不是 Developer ID，用户首次打开需要右键 →「打开」。
+要正经签名得配 Apple Developer 证书并在工作流里加 `codesign` + `notarytool`，
+目前还没做。

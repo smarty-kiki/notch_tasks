@@ -55,7 +55,19 @@ jobs:
         run: |
           TAG="${{ steps.ver.outputs.tag }}"
           ZIP="$(ls dist/NotchTasks-*.zip)"
+          TITLE="任务坞 ${{ steps.ver.outputs.version }}"
+
+          # release notes 取 CHANGELOG.md 里对应版本的段落；
+          # 找不到（比如忘了写 CHANGELOG）就退回 GitHub 自动生成，别让发布卡住
+          if ./scripts/release-notes.sh "${{ steps.ver.outputs.version }}" > notes.md 2>/dev/null; then
+            echo "用 CHANGELOG.md 里的 [${{ steps.ver.outputs.version }}] 段落作为 release notes"
+          else
+            echo "CHANGELOG 里没这段，改用 --generate-notes"
+            gh release create "$TAG" "$ZIP" "$ZIP.sha256" --title "$TITLE" --generate-notes
+            exit 0
+          fi
+
           gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
-            --title "任务坞 ${{ steps.ver.outputs.version }}" \
-            --generate-notes
+            --title "$TITLE" \
+            --notes-file notes.md
           echo "已发布 $TAG"

@@ -35,6 +35,11 @@ jobs:
       - name: 冒烟测试
         run: ./scripts/smoke-test.sh
 
+      - name: 截图脚本能跑通
+        # 只确认脚本本身不会挂（渲染会覆盖 docs/，但不比对像素——
+        # 不同 macOS 版本的字体渲染本来就不同，比对会误报）
+        run: ./scripts/make-screenshots.sh
+
       - name: 通用二进制（arm64 + x86_64）
         run: ./build.sh --clean --universal
 
