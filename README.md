@@ -342,7 +342,7 @@ scripts/
 
 ## 许可
 
-[MIT](LICENSE) © 2026 yaoyang
+[MIT](LICENSE) © 2026 Yao Yang
 
 随便用：可以自由使用、修改、商用、闭源分发，不需要事先问我。
 **但有一件事必须做**——MIT 的条件是：
