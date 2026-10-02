@@ -98,6 +98,11 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
 
 提交 PR 时请保持这个约束。
 
+另外，WorkBuddy 的 `sessions.status` 实际取值只有
+`working` / `pending` / `completed` / `error` / `terminated` / `archived`，
+其中 **`pending` 是「等你确认 / 选择」，不是「排队中」**（这个坑踩过）。
+`archived` 在 SQL 层就已排除。
+
 ## 提交信息
 
 用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 风格，

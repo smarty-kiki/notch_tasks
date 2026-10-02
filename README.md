@@ -184,12 +184,18 @@ cd agent_task_hub
 
 | 展示 | 来源 |
 |---|---|
-| 执行中 | `sessions.status = 'working'` / CLI `status = 'busy'` |
+| 执行中 | WorkBuddy `sessions.status = 'working'` / CLI `status = 'busy'` |
+| **待确认** | WorkBuddy `sessions.status = 'pending'`（**等你确认 / 选择**）、`sessions.unread = 1`、自动化 `automation_runs.read_at IS NULL` |
 | 空闲 | CLI `status = 'idle'`（进程还在，停在提示符） |
-| 排队中 | `sessions.status = 'pending'` |
 | 已完成 | `sessions.status = 'completed'` |
 | 失败 | `status in ('error','terminated')` / 自动化 `result_success = 0` |
-| 待确认 | `automation_runs.read_at IS NULL` 或 `sessions.unread = 1`（**仅 24 小时内**） |
+| 不显示 | `sessions.status = 'archived'` |
+
+> ⚠️ WorkBuddy 的 `pending` 很容易被误读成「排队中」，实际含义是**停在等你确认 / 选择**。
+> 本 App 把它映射成橙黄色的「待确认」并让它参与把手告警——
+> 一个卡在等你回话的任务，正是最该提醒你的事。
+>
+> 「有未读结果」和「等待确认」都套 24 小时窗口，避免一个没人理会的旧状态让把手永久亮着。
 
 时间窗：列表只显示 7 天内；更早的旧未读不再当作待确认，避免永久亮灯。
 

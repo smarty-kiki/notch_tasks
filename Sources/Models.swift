@@ -5,8 +5,7 @@ import SwiftUI
 enum TaskState: String {
     case running      // 执行中
     case idle         // 活着但空闲（终端里的 claude 停在提示符）
-    case queued       // 排队中（已创建未开跑）
-    case needConfirm  // 待确认（有未读结果）
+    case needConfirm  // 待确认（等你确认 / 选择，或有未读结果）
     case done         // 已完成
     case failed       // 失败 / 中断
 
@@ -14,7 +13,6 @@ enum TaskState: String {
         switch self {
         case .running:     return "执行中"
         case .idle:        return "空闲"
-        case .queued:      return "排队中"
         case .needConfirm: return "待确认"
         case .done:        return "已完成"
         case .failed:      return "失败"
@@ -27,9 +25,8 @@ enum TaskState: String {
         case .needConfirm: return 0
         case .running:     return 1
         case .idle:        return 2
-        case .queued:      return 3
-        case .failed:      return 4
-        case .done:        return 5
+        case .failed:      return 3
+        case .done:        return 4
         }
     }
 
@@ -37,7 +34,6 @@ enum TaskState: String {
         switch self {
         case .running:     return Color(red: 0.16, green: 0.56, blue: 1.00)
         case .idle:        return Color(red: 0.42, green: 0.62, blue: 0.72)
-        case .queued:      return Color(white: 0.58)
         case .needConfirm: return Color(red: 1.00, green: 0.62, blue: 0.04)
         case .done:        return Color(red: 0.20, green: 0.80, blue: 0.36)
         case .failed:      return Color(red: 1.00, green: 0.29, blue: 0.24)
@@ -48,7 +44,6 @@ enum TaskState: String {
         switch self {
         case .running:     return "arrow.triangle.2.circlepath"
         case .idle:        return "pause.circle"
-        case .queued:      return "clock"
         case .needConfirm: return "exclamationmark.circle.fill"
         case .done:        return "checkmark.circle.fill"
         case .failed:      return "xmark.octagon.fill"
@@ -56,7 +51,7 @@ enum TaskState: String {
     }
 
     /// 活跃 = 还在跑
-    var isActive: Bool { self == .running || self == .queued }
+    var isActive: Bool { self == .running }
 }
 
 /// 统一任务条目

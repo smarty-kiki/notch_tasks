@@ -173,7 +173,7 @@ final class TaskStore: ObservableObject {
 
             // 只认真正的状态跃迁：运行中→完成 / →待确认 / →失败
             // （避免「待确认」随时间窗自然衰减成「已完成」时误报）
-            let isNewlyDone    = it.state == .done && (old == .running || old == .queued)
+            let isNewlyDone    = it.state == .done && old == .running
             let isNewlyConfirm = it.state == .needConfirm && old != .needConfirm
             let isNewlyFailed  = it.state == .failed && old != .failed
             guard isNewlyDone || isNewlyConfirm || isNewlyFailed else { continue }
@@ -256,23 +256,32 @@ final class TaskStore: ObservableObject {
             let ts = Col.int(st, 4)
             let unread = Col.int(st, 5)
 
+            let updated = epochToDate(ts)
+            let fresh = isFresh(updated)
+
+            // WorkBuddy 的 status 实际取值：working / pending / completed /
+            // error / terminated / archived（archived 已在 SQL 里排除）。
+            // 注意 pending **不是「排队」**，而是停在等你确认 / 选择，
+            // 所以映射成待确认（橙黄），并让它参与告警。
             let state: TaskState
             switch raw {
             case "working":             state = .running
-            case "pending":             state = .queued
+            case "pending":             state = fresh ? .needConfirm : .done
             case "error", "terminated": state = .failed
             default:                    state = .done
             }
+            // 「等你确认」和「有未读结果」都算待确认；
+            // 都套时间窗，避免一个没人理会的旧状态让把手永久亮着
+            let needsConfirm = fresh && (raw == "pending" || unread != 0)
 
-            let updated = epochToDate(ts)
             out.append(TaskItem(id: id,
                                 kind: .session,
                                 title: title,
-                                detail: todos[id],
+                                detail: raw == "pending" ? (todos[id] ?? "等你确认") : todos[id],
                                 cwd: cwd,
                                 state: state,
                                 updatedAt: updated,
-                                needsConfirm: unread != 0 && isFresh(updated)))
+                                needsConfirm: needsConfirm))
         }
         return out
     }

@@ -14,7 +14,9 @@
 - **屏幕右边缘常驻把手**：空闲时是一枚黑色胶囊，紧贴屏幕右边缘、距顶 104pt；
   鼠标悬停向左展开面板，移开约 1 秒后收起（0.8s 等待 + 0.22s 收缩动画）
 - **WorkBuddy 任务监控**：读取 `~/.workbuddy/workbuddy.db` 的会话与自动化运行，
-  展示执行中 / 排队中 / 待确认 / 已完成 / 失败，并在状态跃迁时提醒
+  展示执行中 / 待确认 / 已完成 / 失败，并在状态跃迁时提醒
+- **`pending` 语义修正**：WorkBuddy 的 `session.status = 'pending'` 不是「排队中」，
+  而是**停在等你确认 / 选择**，映射成橙黄色的「待确认」并触发把手告警
 - **终端 Claude Code CLI 监控**：读取 `~/.claude/sessions/<pid>.json`，
   用 `status` 字段区分执行中（`busy`）与空闲（`idle`）；
   存活判断结合 `kill(pid,0)` 与 `proc_pidpath`，避免 PID 复用造成的幽灵会话
