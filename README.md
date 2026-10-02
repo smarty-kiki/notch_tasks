@@ -95,8 +95,17 @@ cd agent_task_hub
 | WorkBuddy（对话 / 自动化） | `WorkBuddy` | 蓝 | 切回 WorkBuddy |
 | 终端 Claude Code CLI | `Claude CLI` | 绿 | 切到 iTerm2 |
 
-状态则由左侧圆点 + 右侧文字表示（执行中 / 空闲 / 待确认 / 已完成 / 失败），
-和来源是两个独立的维度，互不干扰。
+状态由左侧圆点 + 右侧文字表示，**按颜色区分**，不用去猜词义：
+
+| 状态 | 颜色 | 什么时候 |
+|---|---|---|
+| 执行中 | 蓝 | 正在干活 |
+| **待确认** | 橙 | 等你确认 / 授权 / 有未读结果 |
+| 空闲 | 明亮绿 | 没事干：会话活着但停着，或任务刚结束不久 |
+| 已完成 | 灰蓝 | 早就结束了 |
+| 失败 | 红 | 失败 / 中断 |
+
+和来源是两个独立的维度，互不干扰：来源看右侧标签，状态看圆点 + 颜色。
 
 ## 提醒形态
 
@@ -187,22 +196,47 @@ cd agent_task_hub
 
 ## 状态映射
 
-| 展示 | 来源 |
-|---|---|
-| 执行中 | WorkBuddy `sessions.status = 'working'` / CLI `status = 'busy'` |
-| **待确认** | WorkBuddy `sessions.status = 'pending'`（**等你确认 / 选择**）、CLI `status = 'waiting'`、`sessions.unread = 1`、自动化 `automation_runs.read_at IS NULL` |
-| 空闲 | CLI `status = 'idle'`（进程还在，停在提示符） |
-| 已完成 | `sessions.status = 'completed'` |
-| 失败 | `status in ('error','terminated')` / 自动化 `result_success = 0` |
-| 不显示 | `sessions.status = 'archived'` |
+WorkBuddy 和 Claude Code CLI 各自把自家取值映射到**同一套**状态上，
+同一个词在哪边都是同一件事：
+
+| 展示 | 含义 | 配色 | 来源 |
+|---|---|---|---|
+| 执行中 | 正在干活 | 蓝 `#298FFF` | WorkBuddy `status = 'working'` / CLI `status = 'busy'` |
+| **待确认** | 等你确认 / 授权 / 有未读结果 | 橙 `#FF9E0A` | WorkBuddy `status = 'pending'`、`unread != 0`、自动化 `read_at IS NULL`、CLI `status = 'waiting'` |
+| 空闲 | 没事干 | **明亮绿** `#33CC5C` | CLI `status = 'idle'`（进程还在、停在提示符）；**或任务刚结束**（见下） |
+| 已完成 | 早就结束了 | **灰蓝** `#6B9EB8` | `status = 'completed'`，且结束已超过 10 分钟 |
+| 失败 | 失败 / 中断 | 红 `#FF4A3D` | `status in ('error','terminated')` / 自动化 `result_success = 0` |
+| 不显示 | — | — | `status = 'archived'` |
+
+### 「刚完成」与「早就完成」
+
+`done` 是**同一个逻辑状态**，只按时间分成两个视觉档位
+（`TaskItem.recentDoneWindow`，默认 10 分钟）：
+
+| 结束距今 | 显示 | 配色 |
+|---|---|---|
+| ≤ 10 分钟 | 空闲 | 明亮绿，还「热」 |
+| > 10 分钟 | 已完成 | 灰蓝，安静下来了 |
+
+这样视线焦点天然落在「刚有动静的东西」上，而几十小时前的旧任务不会一直抢眼。
+排序也走展示状态，所以刚结束的（绿）排在早就结束的（灰）前面。
+
+> CLI 的 `idle` 一直显示成绿色的「空闲」——进程还活着，随时可以接着用；
+> 而 WorkBuddy 的任务结束了就是结束了，所以会随着时间从绿沉到灰。
 
 > ⚠️ WorkBuddy 的 `pending` 很容易被误读成「排队中」，实际含义是**停在等你确认 / 选择**。
-> 本 App 把它映射成橙黄色的「待确认」并让它参与把手告警——
+> 本 App 把它映射成橙黄的「待确认」并让它参与把手告警——
 > 一个卡在等你回话的任务，正是最该提醒你的事。
->
+
 > 「有未读结果」和「等待确认」都套 24 小时窗口，避免一个没人理会的旧状态让把手永久亮着。
 
 时间窗：列表只显示 7 天内；更早的旧未读不再当作待确认，避免永久亮灯。
+
+整套映射可以离线打出来核对（冒烟测试也在断言它）：
+
+```bash
+./build/NotchTasks --states
+```
 
 ## 构建与运行
 
@@ -221,6 +255,7 @@ make help                # 全部命令（build / run / test / preview / icons /
 ./build/NotchTasks --preview /tmp/np         # 离屏渲染各状态界面 PNG（不需要屏幕录制权限）
 ./build/NotchTasks --animframes /tmp/an      # 逐帧渲染生长动画（progress 0→1），验证锚点
 ./build/NotchTasks --hittest 150 81 6        # 面板内坐标 → 命中的行/底栏按钮
+./build/NotchTasks --states                  # 状态映射表（逻辑状态 → 展示状态 + 配色）
 ```
 
 在真实窗口里抓展开动画的帧（离屏渲染验证不了窗口/容器在各时刻的实际状态）：

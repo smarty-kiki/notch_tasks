@@ -1,11 +1,25 @@
 import Foundation
 import SwiftUI
 
-/// 任务状态（对外展示用）
+/// 任务状态（对外展示用）。
+///
+/// WorkBuddy 和 Claude Code CLI 各自把自家取值映射到这一套上，
+/// 保证同一个词在两个来源里指的是同一件事：
+///
+/// | 状态 | 含义 | 配色 |
+/// |---|---|---|
+/// | `running` | 正在干活 | 蓝 |
+/// | `needConfirm` | 等你确认 / 授权 / 有未读结果 | 橙 |
+/// | `idle` | 没事干（会话活着但停着；或任务刚结束） | **明亮绿** |
+/// | `done` | 早就结束了 | **灰蓝** |
+/// | `failed` | 失败 / 中断 | 红 |
+///
+/// 「刚结束」和「早就结束」是同一个逻辑状态的两个视觉档位，
+/// 由 `TaskItem.displayState` 按时间窗分派，见 `recentDoneWindow`。
 enum TaskState: String {
     case running      // 执行中
-    case idle         // 活着但空闲（终端里的 claude 停在提示符）
-    case needConfirm  // 待确认（等你确认 / 选择，或有未读结果）
+    case idle         // 空闲
+    case needConfirm  // 待确认
     case done         // 已完成
     case failed       // 失败 / 中断
 
@@ -33,9 +47,11 @@ enum TaskState: String {
     var color: Color {
         switch self {
         case .running:     return Color(red: 0.16, green: 0.56, blue: 1.00)
-        case .idle:        return Color(red: 0.42, green: 0.62, blue: 0.72)
         case .needConfirm: return Color(red: 1.00, green: 0.62, blue: 0.04)
-        case .done:        return Color(red: 0.20, green: 0.80, blue: 0.36)
+        // 明亮绿：刚有动静 / 会话活着且空闲
+        case .idle:        return Color(red: 0.20, green: 0.80, blue: 0.36)
+        // 灰蓝：安静下来了（这里用的是「空闲」原来那个颜色）
+        case .done:        return Color(red: 0.42, green: 0.62, blue: 0.72)
         case .failed:      return Color(red: 1.00, green: 0.29, blue: 0.24)
         }
     }
@@ -96,10 +112,21 @@ struct TaskItem: Identifiable, Equatable {
     var updatedAt: Date
     var needsConfirm: Bool = false   // 等你确认 / 有未读结果
 
-    /// 展示用状态：只要「等你关注」，列表里就一律显示成橙黄的「待确认」。
-    /// 否则会出现标题栏写着「N 待确认」、列表里却看不出是哪一个的情况
-    /// （典型场景：任务已完成但结果未读 → needsConfirm 为真、state 仍是 done）。
-    var displayState: TaskState { needsConfirm ? .needConfirm : state }
+    /// 多久之内结束的任务还算「刚完成」
+    static let recentDoneWindow: TimeInterval = 10 * 60
+
+    /// 展示用状态（圆点、状态文字、排序都按它来）。
+    ///
+    /// - 只要「等你关注」→ 一律「待确认」，避免标题栏写着 N 待确认、列表里却找不出是哪一个
+    /// - 刚结束不久的 → 显示成明亮的「空闲」，它已经没事干了、但还「热」
+    /// - 再久 → 沉成灰蓝的「已完成」
+    var displayState: TaskState {
+        if needsConfirm { return .needConfirm }
+        if state == .done, Date().timeIntervalSince(updatedAt) < Self.recentDoneWindow {
+            return .idle
+        }
+        return state
+    }
 
     /// 工作目录的可读标签
     /// - WorkBuddy 的时间戳工作区（2026-10-02-16-56-30）→ 转成「10-02 16:56」这种可读时间

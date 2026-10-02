@@ -40,6 +40,46 @@ if let idx = CommandLine.arguments.firstIndex(of: "--hittest") {
     exit(0)
 }
 
+// 状态映射自检：NotchTasks --states
+// 把「逻辑状态 + 新鲜度」→「展示状态 + 配色」整张表打出来，供人工核对 / 冒烟测试断言。
+// 时间相关的分档（刚完成 vs 早就完成）只有靠它才能离线验。
+if CommandLine.arguments.contains("--states") {
+    func hex(_ c: Color) -> String {
+        guard let s = NSColor(c).usingColorSpace(.sRGB) else { return "?" }
+        return String(format: "#%02X%02X%02X",
+                      Int((s.redComponent * 255).rounded()),
+                      Int((s.greenComponent * 255).rounded()),
+                      Int((s.blueComponent * 255).rounded()))
+    }
+    let now = Date()
+    // (场景, 逻辑状态, 距今多久, 是否需要你确认)
+    let cases: [(String, TaskState, TimeInterval, Bool)] = [
+        ("WorkBuddy working",  .running,     30,          false),
+        ("WorkBuddy pending",  .needConfirm, 30,          true),
+        ("Claude CLI busy",    .running,     5,           false),
+        ("Claude CLI waiting", .needConfirm, 5,           true),
+        ("Claude CLI idle",    .idle,        5,           false),
+        ("完成 10 秒",          .done,        10,          false),
+        ("完成 9 分钟",         .done,        9 * 60,      false),
+        ("完成 11 分钟",        .done,        11 * 60,     false),
+        ("完成 3 小时",         .done,        3 * 3600,    false),
+        ("完成但有未读",        .done,        3 * 3600,    true),
+        ("失败",               .failed,      60,          false),
+    ]
+    print(String(format: "%-18@ %-10@ %-10@ %-8@ %@",
+                 "场景" as NSString, "逻辑" as NSString, "展示" as NSString, "配色" as NSString, "排序" as NSString))
+    for (name, state, age, confirm) in cases {
+        var item = TaskItem(id: name, kind: .session, title: name, detail: nil, cwd: nil,
+                            state: state, updatedAt: now.addingTimeInterval(-age))
+        item.needsConfirm = confirm
+        let shown = item.displayState
+        print(String(format: "%-18@ %-10@ %-10@ %-8@ %d",
+                     name as NSString, state.label as NSString,
+                     shown.label as NSString, hex(shown.color) as NSString, shown.sortRank))
+    }
+    exit(0)
+}
+
 // 无 GUI 自检：NotchTasks --dump  打印当前读取到的任务后退出
 if CommandLine.arguments.contains("--dump") {
     let store = TaskStore()

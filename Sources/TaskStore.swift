@@ -129,7 +129,9 @@ final class TaskStore: ObservableObject {
         lastRefresh = Date()
 
         items.sort { a, b in
-            if a.state.sortRank != b.state.sortRank { return a.state.sortRank < b.state.sortRank }
+            // 按「展示状态」排：刚结束的（显示成空闲绿）要排在早就结束的（已完成灰）前面
+            let ra = a.displayState.sortRank, rb = b.displayState.sortRank
+            if ra != rb { return ra < rb }
             return a.updatedAt > b.updatedAt
         }
 
@@ -262,7 +264,7 @@ final class TaskStore: ObservableObject {
             // WorkBuddy 的 status 实际取值：working / pending / completed /
             // error / terminated / archived（archived 已在 SQL 里排除）。
             // 注意 pending **不是「排队」**，而是停在等你确认 / 选择，
-            // 所以映射成待确认（橙黄），并让它参与告警。
+            // 所以映射成「待确认」（橙黄），并让它参与告警。
             let state: TaskState
             switch raw {
             case "working":             state = .running
@@ -291,9 +293,14 @@ final class TaskStore: ObservableObject {
     private func fetchClaudeSessions() -> [TaskItem] {
         if demoClaude { return Self.demoClaudeItems() }
         return ClaudeStore.liveSessions().map { s in
-            // Claude Code 的 status 已知取值：busy / idle / waiting。
-            // waiting = 停在等用户确认或授权（status == waiting 时才有 waitingFor），
-            // 其余未知取值一律按「在跑」处理，并把原值显示出来便于排查。
+            // Claude Code 的 status 已知取值：busy / idle / waiting，
+            // 和 WorkBuddy 那边的映射对齐（同一个词 = 同一件事）：
+            //
+            //   busy    → 执行中   （= WorkBuddy working）
+            //   waiting → 待确认   （= WorkBuddy pending，且带 waitingFor）
+            //   idle    → 空闲     （会话活着但停着；WorkBuddy 那边没有对应概念）
+            //
+            // 未知取值按「在跑」处理，原值只写进调试日志，不显示到界面上。
             let st = s.status.lowercased()
             let detail: String
             switch st {

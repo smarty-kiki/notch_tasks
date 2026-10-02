@@ -6,9 +6,10 @@
 #
 # 不用起 GUI，也不需要你本机的 WorkBuddy / Claude 数据。检查：
 #   1. 数据源全缺时也不崩
-#   2. 点击命中映射正确
-#   3. 各状态离屏渲染都能出图、且画布尺寸符合布局常量
-#   4. 生长动画逐帧都能出图
+#   2. 状态映射（展示状态 + 配色）符合预期
+#   3. 点击命中映射正确
+#   4. 各状态离屏渲染都能出图、且画布尺寸符合布局常量
+#   5. 生长动画逐帧都能出图
 #
 set -euo pipefail
 
@@ -27,13 +28,37 @@ fail() { echo "   ✗ $*" >&2; exit 1; }
 ok()   { echo "   ✓ $*"; }
 
 # ---------------------------------------------------------------- 1
-echo "== 1/4 数据源缺失时不崩"
+echo "== 1/5 数据源缺失时不崩"
 HOME="$TMP/empty-home" "$BIN" --dump > "$TMP/dump.txt" || fail "--dump 退出码非 0"
 grep -q "读取时间" "$TMP/dump.txt" || fail "--dump 输出不完整"
 ok "--dump 正常输出"
 
 # ---------------------------------------------------------------- 2
-echo "== 2/4 点击命中映射"
+echo "== 2/5 状态映射（WorkBuddy 与 Claude CLI 统一到同一套）"
+# 「展示状态 + 配色」是列表上唯一可见的东西，锁死它，
+# 免得以后改映射时把「刚完成」和「早就完成」又混回去
+STATES="$("$BIN" --states)"
+assert_state() {  # 场景前缀 期望展示 期望配色
+  local line
+  line="$(printf '%s\n' "$STATES" | awk -v k="$1" 'index($0, k) == 1')"
+  [ -n "$line" ] || fail "缺少场景「$1」"
+  case "$line" in
+    *"$2"*"$3"*) ok "$1 → $2 $3" ;;
+    *) fail "$1 得到「$line」，期望 $2 / $3" ;;
+  esac
+}
+assert_state "WorkBuddy working"  "执行中" "#298FFF"
+assert_state "WorkBuddy pending"  "待确认" "#FF9E0A"
+assert_state "Claude CLI busy"    "执行中" "#298FFF"
+assert_state "Claude CLI waiting" "待确认" "#FF9E0A"
+assert_state "Claude CLI idle"    "空闲"   "#33CC5C"
+assert_state "完成 10 秒"          "空闲"   "#33CC5C"   # 刚完成 → 明亮绿
+assert_state "完成 9 分钟"         "空闲"   "#33CC5C"   # 还在窗口内
+assert_state "完成 11 分钟"        "已完成" "#6B9EB8"   # 沉成灰蓝
+assert_state "完成但有未读"        "待确认" "#FF9E0A"
+
+# ---------------------------------------------------------------- 3
+echo "== 3/5 点击命中映射"
 # 面板内坐标（左上原点）：留白 44，行区从 44+35 开始，每行 49，底栏 43
 assert_hit() {
   local got
@@ -52,7 +77,7 @@ assert_hit  10  120 6 "none"       # 左侧留白内
 assert_hit 150   10 6 "none"       # 顶部留白内
 
 # ---------------------------------------------------------------- 3
-echo "== 3/4 离屏渲染"
+echo "== 4/5 离屏渲染"
 # 画布 = 窗口尺寸，由布局常量决定：
 #   收起 = 把手 32×68 + 左右留白，展开 = 面板 420 宽 + 左侧留白 44
 # 改 Sources/NotchUI.swift 里的常量时，同步改这里
@@ -94,7 +119,7 @@ for name, (ew, eh) in checks.items():
 PY
 
 # ---------------------------------------------------------------- 4
-echo "== 4/4 生长动画逐帧"
+echo "== 5/5 生长动画逐帧"
 HOME="$TMP/empty-home" "$BIN" --animframes "$TMP/anim" > /dev/null || fail "--animframes 退出码非 0"
 count="$(find "$TMP/anim" -name '*.png' | wc -l | tr -d ' ')"
 [ "$count" -ge 6 ] || fail "只生成了 $count 帧"

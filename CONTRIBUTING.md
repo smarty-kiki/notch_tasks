@@ -45,13 +45,14 @@ NOTCHTASKS_DEBUG=1 NOTCHTASKS_ANIMPROBE=/tmp/live \
 ./build/NotchTasks --preview /tmp/np         # 离屏渲染各状态 PNG
 ./build/NotchTasks --animframes /tmp/an      # 逐帧渲染生长动画
 ./build/NotchTasks --hittest 150 90 6        # 面板内坐标 → 命中的行/底栏按钮
+./build/NotchTasks --states                  # 状态映射表（逻辑状态 → 展示状态 + 配色）
 ```
 
 ## 代码结构
 
 ```
 Sources/
-  main.swift        入口，--dump / --preview / --animframes / --hittest
+  main.swift        入口，--dump / --preview / --animframes / --hittest / --states
   Models.swift      TaskItem / TaskKind / TaskState / AlertLevel
   Database.swift    只读 SQLite（快照复制后查询）
   ClaudeStore.swift 终端 Claude Code CLI 会话（只读 ~/.claude/sessions）
@@ -108,6 +109,20 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
   （如 `"permission prompt"`）——漏了它就会掉进兜底分支，把英文状态显示到界面上
 
 遇到没见过的取值：映射按「运行中」兜底，原始值写进 `NOTCHTASKS_DEBUG` 日志，别直接显示给用户。
+
+**另一个坑：逻辑状态 ≠ 展示状态。**
+
+`TaskItem.state` 是数据源给的逻辑状态，列表上画的是 `TaskItem.displayState`，两者有意分开：
+
+- `needsConfirm` 为真 → 一律显示「待确认」。否则会出现标题栏写着「N 待确认」、
+  列表里却看不出是哪一个
+- `done` 按 `recentDoneWindow`（10 分钟）分档：窗口内显示成明亮的「空闲」绿，
+  再久沉成灰蓝的「已完成」
+
+改配色/排序请改 `displayState` 那条链路，别去改 `state`——
+`state` 还牵扯告警级别和状态跃迁检测（`detectTransitions`）。
+
+配色和映射可以用 `--states` 离线核对，`scripts/smoke-test.sh` 里也断言了同一张表。
 
 ## 提交信息
 

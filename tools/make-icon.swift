@@ -5,7 +5,7 @@
 //   swift tools/make-icon.swift
 //
 // 图标就是 App 本身的缩影：一块深色「屏幕」，右边缘挂着一个带反角的把手，
-// 左边三颗状态点（执行中 / 待确认 / 已完成），用的是 App 里同一套颜色。
+// 左边三颗状态点（执行中 / 待确认 / 空闲），用的是 App 里同一套颜色。
 // 设计基准 1024×1024，等比缩放到各尺寸；改完重跑本脚本即可。
 //
 import AppKit
@@ -20,7 +20,7 @@ let docs = root.appendingPathComponent("docs")
 // MARK: 颜色（与 Sources/Models.swift 里的 TaskState.color 对齐）
 let cRunning = CGColor(red: 0.16, green: 0.56, blue: 1.00, alpha: 1)
 let cConfirm = CGColor(red: 1.00, green: 0.62, blue: 0.04, alpha: 1)
-let cDone    = CGColor(red: 0.20, green: 0.80, blue: 0.36, alpha: 1)
+let cIdle    = CGColor(red: 0.20, green: 0.80, blue: 0.36, alpha: 1)
 
 /// 右侧贴边、左圆角、右侧带反角的把手——和 App 里 DockShape 同一套几何
 func handlePath(_ rect: CGRect, corner: CGFloat, notch: CGFloat) -> CGPath {
@@ -74,9 +74,9 @@ func makeIcon(px: Int) -> CGImage? {
     }
     ctx.restoreGState()
 
-    // ---- 左：三颗状态点（执行中 / 待确认 / 已完成）----
+    // ---- 左：三颗状态点（执行中 / 待确认 / 空闲）----
     // x 取「squircle 左边缘」到「把手左边缘」的中点，视觉上才不偏
-    let dots: [(y: CGFloat, c: CGColor)] = [(404, cRunning), (512, cConfirm), (620, cDone)]
+    let dots: [(y: CGFloat, c: CGColor)] = [(404, cRunning), (512, cConfirm), (620, cIdle)]
     for d in dots {
         ctx.setShadow(offset: .zero, blur: 40, color: d.c.copy(alpha: 0.9))
         ctx.setFillColor(d.c)
