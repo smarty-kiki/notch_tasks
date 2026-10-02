@@ -31,13 +31,13 @@
 它解决的是一个很具体的问题：**同时在跑的东西太多了**。WorkBuddy 里有几个会话在干活、
 终端里还开着几个 Claude Code CLI，到底哪个跑完了、哪个卡在等你确认，不去逐个切换窗口是不知道的。
 
-- 🟠 **该你出手的时候会吵你**——任务停下来等你确认 / 授权时，把手亮起脉冲描边 + 光晕 + 角标，
+- **该你出手的时候会吵你**——任务停下来等你确认 / 授权时，把手亮起脉冲描边 + 光晕 + 角标，
   可选地响一声、发一条系统通知
-- 🖱️ **扫一眼就知道**——列表按状态排好序，颜色一眼分辨"在跑 / 等你 / 完事了"，
+- **扫一眼就知道**——列表按状态排好序，颜色一眼分辨「在跑 / 等你 / 完事了」，
   刚结束的尤其醒目
-- 🎯 **点一下就回去**——点 WorkBuddy 的任务切回 WorkBuddy，点 CLI 的任务切到 iTerm2
-- 🔒 **只读**——只看状态，不碰你的数据、不改你的任何文件
-- 🪶 **零依赖**——8 个 `.swift` 文件直接 `swiftc` 编出来，没有 SPM / CocoaPods 依赖
+- **点一下就回去**——点 WorkBuddy 的任务切回 WorkBuddy，点 CLI 的任务切到 iTerm2
+- **只读**——只看状态，不碰你的数据、不改你的任何文件
+- **零依赖**——8 个 `.swift` 文件直接 `swiftc` 编出来，没有 SPM / CocoaPods 依赖
 
 <p align="center">
   <img src="docs/把手三种形态.png" width="500" alt="把手的三种形态：常态、有待确认、刚有完成">
@@ -47,7 +47,7 @@
 
 ## 安装
 
-**下载现成的**：到 [Releases](../../releases/latest) 下载
+**下载现成的**：到 [Releases](https://github.com/OWNER/notch_tasks/releases/latest) 下载
 `NotchTasks-<版本>-macos-universal.zip`，解压把 `NotchTasks.app` 拖进「应用程序」。
 
 | 要求 | |
@@ -90,11 +90,11 @@ cd notch_tasks
 
 | 状态 | 颜色 | 含义 | WorkBuddy 侧 | Claude Code CLI 侧 |
 |---|---|---|---|---|
-| **待确认** | 🟠 橙 | 等你确认 / 授权 / 有未读结果 | `status = 'pending'`、`unread != 0`、自动化 `read_at IS NULL` | `status = 'waiting'` |
-| **执行中** | 🔵 蓝 | 正在干活 | `status = 'working'` | `status = 'busy'` |
-| **空闲** | 🟢 明亮绿 | 没事干，或者**刚刚结束** | 任务结束不超过 10 分钟 | `status = 'idle'`（进程还活着） |
-| **已完成** | ⚪️ 灰蓝 | 早就结束了 | `status = 'completed'`，且结束已超过 10 分钟 | — |
-| **失败** | 🔴 红 | 失败 / 中断 | `status in ('error','terminated')` | — |
+| **待确认** | 橙 | 等你确认 / 授权 / 有未读结果 | `status = 'pending'`、`unread != 0`、自动化 `read_at IS NULL` | `status = 'waiting'` |
+| **执行中** | 蓝 | 正在干活 | `status = 'working'` | `status = 'busy'` |
+| **空闲** | 明亮绿 | 没事干，或者**刚刚结束** | 任务结束不超过 10 分钟 | `status = 'idle'`（进程还活着） |
+| **已完成** | 灰蓝 | 早就结束了 | `status = 'completed'`，且结束已超过 10 分钟 | — |
+| **失败** | 红 | 失败 / 中断 | `status in ('error','terminated')` | — |
 
 排序就按这个顺序：**待确认 → 执行中 → 空闲 → 失败 → 已完成**。
 
