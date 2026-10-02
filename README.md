@@ -48,7 +48,13 @@
 ## 安装
 
 **下载现成的**：到 [Releases](https://github.com/OWNER/notch_tasks/releases/latest) 下载
-`NotchTasks-<版本>-macos-universal.zip`，解压把 `NotchTasks.app` 拖进「应用程序」。
+`NotchTasks-<版本>-macos-universal.dmg`，打开后把 `NotchTasks.app` 拖进「应用程序」。
+
+不想用 dmg 的可以下 `.zip`，解压即用。两个包旁边都有 `.sha256` 可以校验：
+
+```bash
+shasum -a 256 -c NotchTasks-1.0.0-macos-universal.dmg.sha256
+```
 
 | 要求 | |
 |---|---|
@@ -273,7 +279,7 @@ make help                # 全部命令
 ./build.sh --universal   # 通用二进制（arm64 + x86_64）
 ./run.sh                 # 编译并启动
 make test                # 冒烟测试
-./package.sh             # 打发布包 → dist/NotchTasks-<版本>-macos-universal.zip
+./package.sh             # 打发布包 → dist/NotchTasks-<版本>-macos-universal.dmg + .zip
 make screenshots         # 重新生成 docs/ 下的截图（用合成数据，可安全公开）
 make icons               # 重新生成 App 图标
 ```

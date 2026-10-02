@@ -19,7 +19,7 @@ debug:
 run:
 	./run.sh
 
-## package     打发布包 → dist/NotchTasks-<版本>-macos-<架构>.zip
+## package     打发布包 → dist/NotchTasks-<版本>-macos-<架构>.dmg + .zip
 package:
 	./package.sh
 

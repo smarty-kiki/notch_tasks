@@ -40,34 +40,49 @@ jobs:
           printf '%s\n' "$V" > VERSION
           echo "本次发布：v$V"
 
-      - name: 构建通用二进制并打包
+      - name: 构建通用二进制并打包（dmg + zip）
         run: ./package.sh
 
       - name: 冒烟测试
         run: ./scripts/smoke-test.sh
 
-      - name: 列出产物
-        run: ls -lh dist/
+      - name: 确认产物齐全
+        run: |
+          set -e
+          ls -lh dist/
+          # 用 find 而不是 shell 通配：zsh 不会对参数展开的结果再做 glob，
+          # 同一个脚本在 bash 和 zsh 下行为不一致，这种坑不值得踩
+          for ext in dmg dmg.sha256 zip zip.sha256; do
+            n=$(find dist -maxdepth 1 -name "NotchTasks-*.$ext" | wc -l | tr -d ' ')
+            if [ "$n" -ne 1 ]; then
+              echo "::error::dist/ 里 *.$ext 应有 1 个，实际 $n 个"
+              exit 1
+            fi
+          done
+          # dmg 至少得能挂载、里面真有 app，否则用户下下来是坏的
+          hdiutil attach dist/NotchTasks-*.dmg -nobrowse -readonly > /dev/null
+          test -d "/Volumes/任务坞/NotchTasks.app"
+          hdiutil detach "/Volumes/任务坞" > /dev/null
+          echo "四个产物齐全，dmg 挂载正常"
 
       - name: 创建 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -e
+          shopt -s nullglob
           TAG="${{ steps.ver.outputs.tag }}"
-          ZIP="$(ls dist/NotchTasks-*.zip)"
           TITLE="任务坞 ${{ steps.ver.outputs.version }}"
+          ASSETS=(dist/NotchTasks-*.dmg dist/NotchTasks-*.dmg.sha256 \
+                  dist/NotchTasks-*.zip dist/NotchTasks-*.zip.sha256)
 
           # release notes 取 CHANGELOG.md 里对应版本的段落；
           # 找不到（比如忘了写 CHANGELOG）就退回 GitHub 自动生成，别让发布卡住
           if ./scripts/release-notes.sh "${{ steps.ver.outputs.version }}" > notes.md 2>/dev/null; then
             echo "用 CHANGELOG.md 里的 [${{ steps.ver.outputs.version }}] 段落作为 release notes"
+            gh release create "$TAG" "${ASSETS[@]}" --title "$TITLE" --notes-file notes.md
           else
             echo "CHANGELOG 里没这段，改用 --generate-notes"
-            gh release create "$TAG" "$ZIP" "$ZIP.sha256" --title "$TITLE" --generate-notes
-            exit 0
+            gh release create "$TAG" "${ASSETS[@]}" --title "$TITLE" --generate-notes
           fi
-
-          gh release create "$TAG" "$ZIP" "$ZIP.sha256" \
-            --title "$TITLE" \
-            --notes-file notes.md
           echo "已发布 $TAG"

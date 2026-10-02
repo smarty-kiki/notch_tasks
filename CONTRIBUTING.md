@@ -19,7 +19,8 @@ swift --version        # 确认工具链在
 ./build.sh                 # 编译到 dist/NotchTasks.app
 ./run.sh                   # 编译并启动
 make test                  # 冒烟测试（不需要 GUI，也不需要本机数据）
-./package.sh               # 打发布包（通用二进制 zip）
+./package.sh               # 打发布包（通用二进制 dmg + zip）
+./package.sh --zip-only     # 只要 zip（dmg 走 hdiutil，慢一点）
 make help                  # 看全部命令
 ```
 
@@ -66,6 +67,7 @@ tools/
 scripts/
   smoke-test.sh       冒烟测试
   make-screenshots.sh 重新生成 docs/ 下全部界面图（用合成数据）
+  make-dmg.sh         .app → dmg（放一个指向 /Applications 的软链）
   release-notes.sh    从 CHANGELOG.md 抽某版本的段落，当 Release 正文
 ```
 
@@ -187,9 +189,10 @@ git push origin vX.Y.Z
 推完标签，Actions 里的 `Release` 工作流会：
 
 1. 从标签解析版本号，写回 `VERSION`
-2. `./package.sh` 构建通用二进制并打 zip + `.sha256`
+2. `./package.sh` 构建通用二进制，出 `.dmg` 与 `.zip`，各带一个 `.sha256`
 3. 跑一遍冒烟测试
-4. 用 `CHANGELOG.md` 里该版本的段落作为 Release 正文，把 zip 与校验文件挂上去
+4. 确认四个产物齐全，并挂载 dmg 确认里面真的躺着 `NotchTasks.app`
+5. 用 `CHANGELOG.md` 里该版本的段落作为 Release 正文，把产物全部挂上去
 
 也可以在 Actions 页面手动触发 `Release`，填版本号即可（不需要先有标签）。
 
@@ -230,7 +233,16 @@ git push -u origin main
 
 ### 发布产物
 
-`NotchTasks-<版本>-macos-universal.zip` 加一个 `.sha256`。
+```
+NotchTasks-<版本>-macos-universal.dmg          挂载后拖进「应用程序」，推荐下载这个
+NotchTasks-<版本>-macos-universal.dmg.sha256
+NotchTasks-<版本>-macos-universal.zip          解压即用
+NotchTasks-<版本>-macos-universal.zip.sha256
+```
+
+dmg 里除了 `.app`，还放了一个指向 `/Applications` 的软链——用户挂载后
+把图标拖到软链上就装好了。之前踩过的坑：打包一旦用 `zip` 命令而不是 `ditto`，
+`.app` 里的权限位与扩展属性会丢，签名随之失效。
 
 注意是 **ad-hoc 签名**，不是 Developer ID，用户首次打开需要右键 →「打开」。
 要正经签名得配 Apple Developer 证书并在工作流里加 `codesign` + `notarytool`，

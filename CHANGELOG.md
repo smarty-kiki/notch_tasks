@@ -63,8 +63,10 @@
 - 8 个 `.swift` 文件直接 `swiftc` 编译，**零第三方依赖**；产物是 `dist/NotchTasks.app`
 - `build.sh` 支持 `--universal`（arm64 + x86_64）、`--debug`、`--clean`，
   版本号从 `VERSION` 注入 Info.plist，构建号取 git 提交数
-- `package.sh` 用 `ditto` 打包（保住权限位与签名），产出
-  `NotchTasks-<版本>-macos-universal.zip` 与 `.sha256`
+- `package.sh` 出两种产物，各带一个 `.sha256`：`.dmg`（挂载后拖进「应用程序」，
+  推荐普通用户下载）与 `.zip`（解压即用）。dmg 由 `scripts/make-dmg.sh` 用 `hdiutil`
+  生成，里面放好指向 `/Applications` 的软链；打包一律用 `ditto` 而不是 `zip` 命令，
+  否则 `.app` 里的权限位与扩展属性会丢、签名会坏
 - `scripts/smoke-test.sh` 冒烟测试：数据源全缺时不崩、状态映射与配色、点击命中映射、
   各状态离屏渲染的画布尺寸、生长动画逐帧，本地与 CI 共用同一份
 - App 图标由 `tools/make-icon.swift` 生成（可复现，10 个尺寸齐全）；
