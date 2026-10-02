@@ -332,7 +332,7 @@ final class TaskStore: ObservableObject {
 
             return TaskItem(id: "\(s.pid)",
                             kind: .claude,
-                            title: s.name,
+                            title: s.displayTitle,   // Claude 起的会话标题，和终端标签一致
                             detail: detail,
                             cwd: s.cwd,
                             state: state,
@@ -386,8 +386,9 @@ final class TaskStore: ObservableObject {
                      state: .needConfirm, updatedAt: minutesAgo(4),
                      needsConfirm: true),
 
+            // CLI 行的标题是 Claude 自己起的会话标题（ai-title），不是派生名
             TaskItem(id: "demo-c1", kind: .claude,
-                     title: "example-api-ef",
+                     title: "补上接口层的集成测试",
                      detail: "正在执行",
                      cwd: home + "/Projects/example_api",
                      state: .running, updatedAt: minutesAgo(0.8)),
@@ -400,7 +401,7 @@ final class TaskStore: ObservableObject {
                      state: .done, updatedAt: minutesAgo(6)),
 
             TaskItem(id: "demo-c2", kind: .claude,
-                     title: "example-server-1e",
+                     title: "梳理示例服务的部署脚本",
                      detail: "等你输入",
                      cwd: home + "/Projects/example_server",
                      state: .idle, updatedAt: minutesAgo(13)),

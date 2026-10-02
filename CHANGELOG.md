@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-03
+
+列表里的 CLI 任务改用 Claude 自己起的会话标题，和 iTerm2 标签页对得上。
+
+### 新增
+
+- **CLI 任务行改用 Claude 自己起的会话标题**：以前显示的是注册表里的派生名
+  （`kiki-2d` 这种），跟 iTerm2 标签页上看到的对不上。现在读会话记录
+  `projects/<cwd>/<sessionId>.jsonl` 里的 `{"type":"ai-title","aiTitle":"…"}`——
+  这正是 Claude 写进终端标签的那个标题。只读文件尾部 256 KB 并按 mtime + size 缓存，
+  不必反复解析几十 MB 的记录；会话刚开始还没标题时退回派生名
+
+### 文档
+
+- 说明 `~/.claude/sessions/` 会被 Claude Code **按日清理**（`~/.claude/.last-cleanup`），
+  清理后那一刻目录为空、列表里没有 CLI 会话，属于数据源的正常行为
+
 ## [1.0.0] - 2026-10-02
 
 首个版本：屏幕右边缘的一枚把手，鼠标扫过去向左展开，把 **WorkBuddy** 与
@@ -88,5 +105,6 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.1
 [1.0.0]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.0

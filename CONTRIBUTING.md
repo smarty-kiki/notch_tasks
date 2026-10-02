@@ -128,6 +128,11 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
 - Claude Code `status` 取值是 `busy` / `idle` / `waiting`。
   **`waiting` 表示停在等你确认 / 授权**，此时会多一个 `waitingFor` 字段
   （如 `"permission prompt"`）——漏了它就会掉进兜底分支，把英文状态显示到界面上
+- 两处容易误判的地方：
+  - `~/.claude/sessions/` 会被 Claude Code **按日清理**，清完那一刻是空的，
+    「列表里没有 CLI 会话」很可能只是没会话在跑，不是读不到
+  - 列表标题要读**会话记录**里的 `ai-title`，不是注册表里的 `name`——
+    后者是派生的（`kiki-2d` 这种），跟终端标签对不上
 
 遇到没见过的取值：映射按「运行中」兜底，原始值写进 `NOTCHTASKS_DEBUG` 日志，别直接显示给用户。
 

@@ -133,6 +133,7 @@ cd notch_tasks
 | `~/.workbuddy/workbuddy.db` → `automation_runs` | 自动化运行，`read_at IS NULL` = 待确认 |
 | `~/.workbuddy/tasks/<sessionId>/*.json` | 当前 `in_progress` 子任务，显示成「正在：…」 |
 | `~/.claude/sessions/<pid>.json` | 终端里 Claude Code CLI 的会话与执行状态 |
+| `~/.claude/projects/<cwd>/<sessionId>.jsonl` | 会话记录里的 `ai-title`——即 Claude 给终端标签起的标题 |
 
 **零写入保证**：程序从不打开原库。每一轮把 `workbuddy.db` / `-wal` / `-shm`
 复制到系统临时目录 `notchtasks-snapshot/`，只在副本上查询，并加 `PRAGMA query_only = ON`。
@@ -155,8 +156,19 @@ cd notch_tasks
 - 未知取值一律按「运行中」处理，原始英文只写进 `NOTCHTASKS_DEBUG` 日志，不显示到界面上
 - 存活判断：`kill(pid, 0)` **加上** `proc_pidpath` 校验可执行文件路径里含 `claude`——
   只看 PID 会被系统复用骗到，出现早就退出的"幽灵会话"
-- 标题用 Claude 自己给会话起的 `name`（同时也是终端的标签页标题），方便和 iTerm2 对上
 - 时间取「`updatedAt` 字段」与「文件 mtime」里更晚的那个
+
+**列表里的标题来自会话记录，不是注册表。** 注册表里那个 `name`（如 `kiki-2d`）
+是派生的，跟终端标签对不上；Claude 真正起的标题写在
+`projects/<cwd 转义>/<sessionId>.jsonl` 的 `{"type":"ai-title","aiTitle":"…"}` 记录里，
+会随会话推进反复重写。所以从记录**尾部**往前找最近的一条（只读尾部 256 KB，
+按 mtime + size 缓存，不必反复解析几十 MB 的记录）；会话刚开始还没标题时，
+退回用注册表里的派生名。
+
+> 顺带一个容易误判的现象：`~/.claude/sessions/` 会被 Claude Code 自己**按日清理**
+> （见 `~/.claude/.last-cleanup`）。清理后那一刻目录是空的，
+> App 自然一条 CLI 会话也列不出来，直到下一个会话注册进来。这是数据源的正常行为，
+> 不是 App 读不到。
 
 </details>
 
