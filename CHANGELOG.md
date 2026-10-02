@@ -3,7 +3,9 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.0.3] - 2026-10-03
+
+修掉一个会让 CLI 会话凭空消失的问题（注册表文件被写坏），并把提示音放大到听得清。
 
 ### 修复
 
@@ -152,7 +154,8 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.3
 [1.0.2]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.2
 [1.0.1]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.1
 [1.0.0]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.0
