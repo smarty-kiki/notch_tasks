@@ -15,8 +15,11 @@
   鼠标悬停向左展开面板，移开约 1 秒后收起（0.8s 等待 + 0.22s 收缩动画）
 - **WorkBuddy 任务监控**：读取 `~/.workbuddy/workbuddy.db` 的会话与自动化运行，
   展示执行中 / 待确认 / 已完成 / 失败，并在状态跃迁时提醒
-- **`pending` 语义修正**：WorkBuddy 的 `session.status = 'pending'` 不是「排队中」，
-  而是**停在等你确认 / 选择**，映射成橙黄色的「待确认」并触发把手告警
+- **等待确认的状态修正**：两处 `status` 的语义都曾被映射错
+  - WorkBuddy `session.status = 'pending'` 不是「排队中」，而是**停在等你确认 / 选择**
+  - Claude Code CLI `status = 'waiting'`（伴随 `waitingFor`，如 `"permission prompt"`）
+    之前落到了兜底分支，界面上直接显示了英文 `waiting`
+  两者现在都映射成橙黄色的「待确认」并触发把手告警
 - **终端 Claude Code CLI 监控**：读取 `~/.claude/sessions/<pid>.json`，
   用 `status` 字段区分执行中（`busy`）与空闲（`idle`）；
   存活判断结合 `kill(pid,0)` 与 `proc_pidpath`，避免 PID 复用造成的幽灵会话

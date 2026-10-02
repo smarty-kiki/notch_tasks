@@ -7,21 +7,24 @@ struct ClaudeSession {
     var sessionID: String
     var cwd: String
     var name: String
-    var status: String        // "idle" / 其它
+    var status: String        // busy / idle / waiting
+    var waitingFor: String?   // 仅 status == waiting 时出现，例如 "permission prompt"
     var updatedAt: Date
     var alive: Bool           // PID 存在
     var isClaude: Bool        // 该 PID 的可执行文件确实是 claude（排除 PID 复用）
 
-    var isRunning: Bool {
-        let s = status.lowercased()
-        return !s.isEmpty && s != "idle"
-    }
+    /// 正在干活
+    var isBusy: Bool { status.lowercased() == "busy" }
+    /// 停在等用户确认 / 授权
+    var isWaiting: Bool { status.lowercased() == "waiting" }
 }
 
 /// 只读扫描 Claude Code 的会话注册表。
 ///
 /// 数据源：`~/.claude/sessions/<pid>.json`，形如
 /// `{"pid":44187,"sessionId":"…","cwd":"…","name":"crewup-api-ef","status":"idle","updatedAt":…}`
+/// `status` 已知取值：`busy`（干活）/ `idle`（等你输入）/ `waiting`（等你确认或授权，
+/// 此时会多一个 `waitingFor` 字段，例如 `"permission prompt"`）
 /// 文件名就是 PID，所以可以用 `kill(pid,0)` + `proc_pidpath` 判断会话是否还活着，
 /// 并排除 PID 被复用的情况。全程只读，不碰 Claude 的任何文件。
 enum ClaudeStore {
@@ -59,6 +62,7 @@ enum ClaudeStore {
                 cwd: cwd,
                 name: name.isEmpty ? "claude" : name,
                 status: obj["status"] as? String ?? "",
+                waitingFor: (obj["waitingFor"] as? String).flatMap { $0.isEmpty ? nil : $0 },
                 updatedAt: updated,
                 alive: isAlive(pid),
                 isClaude: executablePath(pid)?.contains("claude") ?? false))

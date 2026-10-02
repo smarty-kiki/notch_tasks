@@ -94,7 +94,12 @@ struct TaskItem: Identifiable, Equatable {
     var cwd: String?
     var state: TaskState
     var updatedAt: Date
-    var needsConfirm: Bool = false   // 用户尚未查看结果
+    var needsConfirm: Bool = false   // 等你确认 / 有未读结果
+
+    /// 展示用状态：只要「等你关注」，列表里就一律显示成橙黄的「待确认」。
+    /// 否则会出现标题栏写着「N 待确认」、列表里却看不出是哪一个的情况
+    /// （典型场景：任务已完成但结果未读 → needsConfirm 为真、state 仍是 done）。
+    var displayState: TaskState { needsConfirm ? .needConfirm : state }
 
     /// 工作目录的可读标签
     /// - WorkBuddy 的时间戳工作区（2026-10-02-16-56-30）→ 转成「10-02 16:56」这种可读时间

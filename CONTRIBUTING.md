@@ -98,10 +98,16 @@ SwiftUI 的 `Button` / `onTapGesture` 收不到点击。所以行点击和底栏
 
 提交 PR 时请保持这个约束。
 
-另外，WorkBuddy 的 `sessions.status` 实际取值只有
-`working` / `pending` / `completed` / `error` / `terminated` / `archived`，
-其中 **`pending` 是「等你确认 / 选择」，不是「排队中」**（这个坑踩过）。
-`archived` 在 SQL 层就已排除。
+**两个 `status` 字段都容易被想当然，两个坑都踩过：**
+
+- WorkBuddy `sessions.status` 实际取值只有
+  `working` / `pending` / `completed` / `error` / `terminated` / `archived`，
+  其中 **`pending` 是「等你确认 / 选择」，不是「排队中」**；`archived` 在 SQL 层已排除
+- Claude Code `status` 取值是 `busy` / `idle` / `waiting`。
+  **`waiting` 表示停在等你确认 / 授权**，此时会多一个 `waitingFor` 字段
+  （如 `"permission prompt"`）——漏了它就会掉进兜底分支，把英文状态显示到界面上
+
+遇到没见过的取值：映射按「运行中」兜底，原始值写进 `NOTCHTASKS_DEBUG` 日志，别直接显示给用户。
 
 ## 提交信息
 

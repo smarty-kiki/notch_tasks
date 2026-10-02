@@ -52,7 +52,7 @@ if CommandLine.arguments.contains("--dump") {
     print(String(repeating: "-", count: 78))
     for (i, t) in store.tasks.enumerated() {
         let flag = t.needsConfirm ? "❗️" : (t.state.isActive ? "▶︎" : " ")
-        print(String(format: "%2d %@ [%-5@] %@", i + 1, flag, t.state.label as NSString, t.title))
+        print(String(format: "%2d %@ [%-5@] %@", i + 1, flag, t.displayState.label as NSString, t.title))
         var sub: [String] = []
         if let d = t.detail { sub.append(d) }
         if let c = t.cwd { sub.append(c) }

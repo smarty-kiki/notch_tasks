@@ -174,7 +174,12 @@ cd agent_task_hub
  "status":"busy","updatedAt":1790944083343}
 ```
 
-- `status`：`busy` = 正在执行，`idle` = 空闲等你输入；其它取值一律按「运行中」处理并显示原值
+- `status` 已知三种取值：
+  - `busy` = 正在执行
+  - `idle` = 空闲，停在提示符等你输入
+  - **`waiting` = 停在等你确认 / 授权**，此时会多一个 `waitingFor` 字段
+    （例如 `"permission prompt"`），映射成橙黄色的「待确认」并触发把手告警
+- 未知取值一律按「运行中」处理，原始英文只写进 `NOTCHTASKS_DEBUG` 日志，不显示在界面上
 - 存活判断：`kill(pid, 0)` **加上** `proc_pidpath` 校验可执行文件里含 `claude`，
   排除 PID 被系统复用后出现的幽灵会话
 - 标题用 Claude 自己给会话起的 `name`（同时是它的终端标题），便于和 iTerm2 标签页对上
@@ -185,7 +190,7 @@ cd agent_task_hub
 | 展示 | 来源 |
 |---|---|
 | 执行中 | WorkBuddy `sessions.status = 'working'` / CLI `status = 'busy'` |
-| **待确认** | WorkBuddy `sessions.status = 'pending'`（**等你确认 / 选择**）、`sessions.unread = 1`、自动化 `automation_runs.read_at IS NULL` |
+| **待确认** | WorkBuddy `sessions.status = 'pending'`（**等你确认 / 选择**）、CLI `status = 'waiting'`、`sessions.unread = 1`、自动化 `automation_runs.read_at IS NULL` |
 | 空闲 | CLI `status = 'idle'`（进程还在，停在提示符） |
 | 已完成 | `sessions.status = 'completed'` |
 | 失败 | `status in ('error','terminated')` / 自动化 `result_success = 0` |

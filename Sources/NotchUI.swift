@@ -528,11 +528,14 @@ private struct TaskRow: View {
     var task: TaskItem
     @State private var hover = false
 
+    /// 圆点、状态文字都按它来画，保证「等你确认」的行一眼能认出来
+    private var shown: TaskState { task.displayState }
+
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
-                Circle().fill(task.state.color.opacity(0.22)).frame(width: 16, height: 16)
-                Circle().fill(task.state.color).frame(width: 7, height: 7)
+                Circle().fill(shown.color.opacity(0.22)).frame(width: 16, height: 16)
+                Circle().fill(shown.color).frame(width: 7, height: 7)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
@@ -547,9 +550,9 @@ private struct TaskRow: View {
             Spacer(minLength: 6)
             SourceChip(kind: task.kind)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(task.state.label)
+                Text(shown.label)
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(task.state.color)
+                    .foregroundStyle(shown.color)
                 Text(task.relativeTime)
                     .font(.system(size: 9))
                     .foregroundStyle(Color(white: 0.42))
@@ -557,7 +560,10 @@ private struct TaskRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
-        .background(hover ? Color.white.opacity(0.07) : (task.needsConfirm ? task.state.color.opacity(0.08) : .clear))
+        // 需要你关注的行统一染橙黄，不跟着状态色走——
+        // 否则「已完成 + 有未读」会染成绿色，和标题栏的「待确认」对不上
+        .background(hover ? Color.white.opacity(0.07)
+                    : (task.needsConfirm ? TaskState.needConfirm.color.opacity(0.10) : .clear))
         .contentShape(Rectangle())
         .onHover { hover = $0 }
     }

@@ -291,22 +291,46 @@ final class TaskStore: ObservableObject {
     private func fetchClaudeSessions() -> [TaskItem] {
         if demoClaude { return Self.demoClaudeItems() }
         return ClaudeStore.liveSessions().map { s in
-            // Claude Code 的 status 目前已知取值：busy / idle。
-            // 其余取值一律按「在跑」处理，并把原值显示出来便于排查。
+            // Claude Code 的 status 已知取值：busy / idle / waiting。
+            // waiting = 停在等用户确认或授权（status == waiting 时才有 waitingFor），
+            // 其余未知取值一律按「在跑」处理，并把原值显示出来便于排查。
             let st = s.status.lowercased()
             let detail: String
             switch st {
-            case "busy":  detail = "正在执行"
-            case "idle":  detail = "等你输入"
-            default:      detail = st.isEmpty ? "运行中" : "运行中 · \(st)"
+            case "busy":    detail = "正在执行"
+            case "idle":    detail = "等你输入"
+            case "waiting": detail = Self.waitingText(s.waitingFor)
+            default:
+                // 未知取值只在调试日志里露出原始英文，界面上不显示
+                AppDebug.log("[claude] 未知 status=\(st) name=\(s.name)")
+                detail = "运行中"
             }
+
+            let state: TaskState
+            switch st {
+            case "idle":    state = .idle
+            case "waiting": state = .needConfirm
+            default:        state = .running
+            }
+
             return TaskItem(id: "\(s.pid)",
                             kind: .claude,
                             title: s.name,
                             detail: detail,
                             cwd: s.cwd,
-                            state: st == "idle" ? .idle : .running,
-                            updatedAt: s.updatedAt)
+                            state: state,
+                            updatedAt: s.updatedAt,
+                            // 等确认才算「待确认」，并套时间窗，避免僵尸会话一直亮着
+                            needsConfirm: st == "waiting" && self.isFresh(s.updatedAt))
+        }
+    }
+
+    /// waitingFor 的可读描述
+    private static func waitingText(_ raw: String?) -> String {
+        guard let raw, !raw.isEmpty else { return "等你确认" }
+        switch raw.lowercased() {
+        case "permission prompt", "permission": return "等你确认权限"
+        default: return "等你确认 · \(raw)"
         }
     }
 
