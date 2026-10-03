@@ -16,6 +16,15 @@ struct ClaudeSession {
     var updatedAt: Date
     var alive: Bool           // PID 存在
     var isClaude: Bool        // 该 PID 的可执行文件确实是 claude（排除 PID 复用）
+    var source: Source = .registry
+
+    /// 这条会话是怎么发现的
+    enum Source: String {
+        /// `~/.claude/sessions/<pid>.json` 里有它 —— status 是 Claude 自己写的，最准
+        case registry
+        /// 注册表里没有，但会话记录还在动 —— 状态只能从记录尾部推断
+        case transcript
+    }
 
     /// 正在干活
     var isBusy: Bool { status.lowercased() == "busy" }
@@ -59,7 +68,7 @@ enum ClaudeStore {
     private static let fullScanLimit = 8 * 1024 * 1024
 
     /// 记录文件 → 上次解析结果。轮询每 2 秒跑一次，靠它避免反复读同一条记录
-    private static var titleCache: [String: (mtime: Date, size: Int, title: String?)] = [:]
+    private static var infoCache: [String: (mtime: Date, size: Int, info: TailInfo)] = [:]
 
     /// 注册表文件 → 上次解析成功的内容。
     /// 轮询正好撞上 Claude 写文件的瞬间时，会读到半截内容；这时沿用上一轮的值，
@@ -115,7 +124,7 @@ enum ClaudeStore {
                 sessionID: sessionID,
                 cwd: cwd,
                 name: name.isEmpty ? "claude" : name,
-                aiTitle: transcriptTitle(sessionID: sessionID, in: projectDirs),
+                aiTitle: transcriptInfo(sessionID: sessionID, in: projectDirs).title,
                 status: obj["status"] as? String ?? "",
                 waitingFor: (obj["waitingFor"] as? String).flatMap { $0.isEmpty ? nil : $0 },
                 updatedAt: updated,
@@ -175,69 +184,228 @@ enum ClaudeStore {
         return nil
     }
 
-    /// 还活着的 claude 会话
+    /// 还活着的 claude 会话（来自注册表）
     static func liveSessions() -> [ClaudeSession] {
         scan().filter { $0.alive && $0.isClaude }
     }
 
-    // MARK: - 会话标题（= Claude 写进终端标签的那个名字）
+    /// 列表要显示的全部 CLI 会话 = 注册表里的 **∪** 只有会话记录在动的。
+    static func all(transcriptWindow: TimeInterval = 15 * 60) -> [ClaudeSession] {
+        let registered = liveSessions()
+        let known = Set(registered.compactMap { $0.sessionID.isEmpty ? nil : $0.sessionID })
+        return registered + recentFromTranscripts(within: transcriptWindow, excluding: known)
+    }
+
+    /// 只靠**会话记录**发现的会话。
+    ///
+    /// 为什么需要这个：`~/.claude/sessions/<pid>.json` 这个注册表并不可靠 ——
+    /// 被程序 spawn 出来的 claude（比如 StaffDeck 起的数字员工）照样写会话记录、
+    /// 照样在干活，却不会出现在注册表里。只看注册表，这类任务在列表里完全不见。
+    ///
+    /// （实测过：某个会话的记录文件持续在写、最后一条消息 stop_reason 还是 `tool_use`，
+    ///   而同一时刻 `sessions/` 里只有另一个会话的文件 —— 两个会话是同时创建的，
+    ///   一个注册了、一个没有，跟「按日清理」无关。）
+    ///
+    /// 所以这里反过来以**会话记录**为准：谁的文件最近还在动，谁就在跑。
+    /// 代价是拿不到 Claude 自己写的 status，只能从记录尾部推断：
+    /// 最后一条消息 `stop_reason == tool_use` → 在跑工具；`end_turn` → 已经答完。
+    static func recentFromTranscripts(within window: TimeInterval,
+                                      excluding known: Set<String>) -> [ClaudeSession] {
+        let fm = FileManager.default
+        guard let dirs = try? fm.contentsOfDirectory(atPath: projectsDir) else { return [] }
+        let cutoff = Date().addingTimeInterval(-window)
+        var out: [ClaudeSession] = []
+
+        for d in dirs {
+            let dirPath = (projectsDir as NSString).appendingPathComponent(d)
+            guard let files = try? fm.contentsOfDirectory(atPath: dirPath) else { continue }
+            for f in files where f.hasSuffix(".jsonl") {
+                let path = (dirPath as NSString).appendingPathComponent(f)
+
+                // 先看 mtime（便宜），不在窗口内就不去读内容
+                guard let attrs = try? fm.attributesOfItem(atPath: path),
+                      let mtime = attrs[.modificationDate] as? Date, mtime >= cutoff,
+                      let size = (attrs[.size] as? NSNumber)?.intValue, size > 0
+                else { continue }
+
+                let sid = f.replacingOccurrences(of: ".jsonl", with: "")
+                guard !known.contains(sid) else { continue }
+
+                let info = tailInfoCached(path: path, size: size, mtime: mtime)
+                let cwd = info.cwd ?? ""
+
+                out.append(ClaudeSession(
+                    pid: 0,                       // 没有 PID：这条不是从注册表来的
+                    sessionID: sid,
+                    cwd: cwd,
+                    name: (cwd as NSString).lastPathComponent,
+                    aiTitle: info.title,
+                    // 复用注册表那套词，让下游映射不用分叉
+                    status: inferredStatus(info),
+                    // 注册表里这类会写 "permission prompt"；我们从工具名给个等价的
+                    waitingFor: inferredStatus(info) == "waiting" ? waitingReason(info.pendingTool) : nil,
+                    updatedAt: mtime,
+                    alive: true,                  // 文件刚动过就算活着
+                    isClaude: true,
+                    source: .transcript))
+            }
+        }
+        return out
+    }
+
+    // MARK: - 会话记录的尾部
+
+    /// 发起后**必须由用户回应**的工具 —— 它们停在「等结果」就是在等你。
+    /// （普通的 Bash / Edit 停在那儿分不清「在跑」还是「等你批准」，所以不列进来）
+    static let userFacingTools: Set<String> = ["AskUserQuestion", "ExitPlanMode"]
+
+    /// 从会话记录尾部能读出来的东西
+    struct TailInfo {
+        /// Claude 给会话起的标题（= 终端标签名）
+        var title: String?
+        /// 会话的工作目录
+        var cwd: String?
+        /// 最后一条消息的 `stop_reason`。
+        /// 只有 `end_turn` 表示「助手答完了、在等你」，其余（`tool_use`、
+        /// 或者 user 消息那种压根没有 stop_reason 的）都还在往下走
+        var lastStop: String?
+        /// 最后发起、但**没有拿到结果**的工具名。
+        /// 有些工具一发起就是在等人（见 `userFacingTools`），据此判断「待确认」
+        var pendingTool: String?
+        static let empty = TailInfo()
+    }
 
     /// 会话记录的文件名就是 sessionId（UUID），所以按文件名找即可，
     /// 不用去猜 cwd 到目录名的转义规则
-    private static func transcriptTitle(sessionID: String, in projectDirs: [String]) -> String? {
-        guard !sessionID.isEmpty else { return nil }
+    private static func transcriptInfo(sessionID: String, in projectDirs: [String]) -> TailInfo {
+        guard !sessionID.isEmpty else { return .empty }
         for dir in projectDirs {
             let path = (dir as NSString).appendingPathComponent("\(sessionID).jsonl")
-            if let t = transcriptTitle(path: path) { return t }
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+                  let mtime = attrs[.modificationDate] as? Date,
+                  let size = (attrs[.size] as? NSNumber)?.intValue, size > 0 else { continue }
+            return tailInfoCached(path: path, size: size, mtime: mtime)
         }
-        return nil
+        return .empty
     }
 
-    private static func transcriptTitle(path: String) -> String? {
-        let fm = FileManager.default
-        guard let attrs = try? fm.attributesOfItem(atPath: path),
-              let mtime = attrs[.modificationDate] as? Date,
-              let size = (attrs[.size] as? NSNumber)?.intValue, size > 0 else { return nil }
+    /// 从记录尾部推断状态（注册表里没有的会话只能这么办）
+    ///
+    /// 两个信号，按可靠性排序：
+    /// 1. **停在等人回应的工具上** → `waiting`。`AskUserQuestion` / `ExitPlanMode`
+    ///    发起后本来就要用户回话，它们没拿到结果就说明人还没理它
+    /// 2. 否则看最后一条消息的 `stop_reason`：只有 `end_turn`（助手明确答完）才算
+    ///    `idle`，其余一律 `busy` —— 工具执行完写下的是 `user`(`tool_result`)，
+    ///    那条没有 `stop_reason`，而此刻助手马上就要接着干活
+    private static func inferredStatus(_ info: TailInfo) -> String {
+        if let tool = info.pendingTool, userFacingTools.contains(tool) { return "waiting" }
+        return info.lastStop == "end_turn" ? "idle" : "busy"
+    }
 
-        if let hit = titleCache[path], hit.mtime == mtime, hit.size == size {
-            return hit.title
+    /// 推断出来的 waitingFor，和注册表里的取值（如 "permission prompt"）对齐
+    private static func waitingReason(_ tool: String?) -> String? {
+        switch tool {
+        case "AskUserQuestion": return "question"
+        case "ExitPlanMode":    return "plan approval"
+        default:                return nil
+        }
+    }
+
+    /// 带缓存地读尾部；标题偶尔很久才写一条，尾部没命中就退回整文件扫一次
+    private static func tailInfoCached(path: String, size: Int, mtime: Date) -> TailInfo {
+        if let hit = infoCache[path], hit.mtime == mtime, hit.size == size {
+            return hit.info
         }
 
-        var found = lastAITitle(at: path, from: max(0, size - tailBytes))
-        if found == nil, size > tailBytes, size <= fullScanLimit {
-            found = lastAITitle(at: path, from: 0)
+        var info = tailInfo(at: path, from: max(0, size - tailBytes))
+        if info.title == nil, size > tailBytes, size <= fullScanLimit {
+            info.title = tailInfo(at: path, from: 0).title
         }
 
-        titleCache[path] = (mtime, size, found)
+        infoCache[path] = (mtime, size, info)
         // 会话来来去去，别让这个表无限涨；真溢出了清空重来也无所谓
-        if titleCache.count > 128 { titleCache.removeAll() }
-        return found
+        if infoCache.count > 128 { infoCache.removeAll() }
+        return info
     }
 
-    /// 从 offset 开始读到底，取最后一条 `{"type":"ai-title","aiTitle":"…"}` 里的标题
-    private static func lastAITitle(at path: String, from offset: Int) -> String? {
+    /// 从 offset 开始读到底，一次拿齐「标题 / cwd / 最后一条消息的状态」。
+    ///
+    /// 三个字段各自取**最后一次出现**即可：从后往前扫，谁的坑还没填就顺手填上，
+    /// 三个都填齐就提前退出 —— 不用为了读一个字段把整个文件解析一遍。
+    private static func tailInfo(at path: String, from offset: Int) -> TailInfo {
+        guard let text = readText(at: path, from: offset) else { return .empty }
+
+        var info = TailInfo.empty
+        // 已经拿到结果的工具调用。从后往前扫，先扫到的都是「更靠后」的，
+        // 所以轮到某个 tool_use 时，它之后有没有 tool_result 已经清楚了
+        var returned = Set<String>()
+
+        for line in text.split(separator: "\n").reversed() {
+            guard line.hasPrefix("{") else { continue }
+            let needTitle = info.title == nil
+            let needCwd = info.cwd == nil
+            let needStop = info.lastStop == nil
+            let needTool = info.pendingTool == nil
+            if !needTitle && !needCwd && !needStop && !needTool { break }
+
+            if line.contains("tool_result") {
+                if let o = jsonObject(line),
+                   let msg = o["message"] as? [String: Any],
+                   let content = msg["content"] as? [[String: Any]] {
+                    for c in content where (c["type"] as? String) == "tool_result" {
+                        if let id = c["tool_use_id"] as? String { returned.insert(id) }
+                    }
+                }
+            }
+            if needTool, line.contains("tool_use") {
+                if let o = jsonObject(line),
+                   let msg = o["message"] as? [String: Any],
+                   let content = msg["content"] as? [[String: Any]] {
+                    for c in content where (c["type"] as? String) == "tool_use" {
+                        if let id = c["id"] as? String, !returned.contains(id) {
+                            info.pendingTool = c["name"] as? String
+                        }
+                    }
+                }
+            }
+
+            if needTitle, line.contains("aiTitle") {
+                if let o = jsonObject(line), let raw = o["aiTitle"] as? String {
+                    let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !t.isEmpty { info.title = t }
+                }
+            }
+            if needCwd, line.contains("\"cwd\"") {
+                if let o = jsonObject(line), let c = o["cwd"] as? String, !c.isEmpty {
+                    info.cwd = c
+                }
+            }
+            if needStop {
+                if let o = jsonObject(line),
+                   let type = o["type"] as? String, type == "user" || type == "assistant" {
+                    info.lastStop = ((o["message"] as? [String: Any])?["stop_reason"] as? String) ?? ""
+                }
+            }
+        }
+        return info
+    }
+
+    private static func jsonObject(_ line: Substring) -> [String: Any]? {
+        guard let d = line.data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: d) as? [String: Any]
+    }
+
+    /// 读文件的一段到结尾
+    private static func readText(at path: String, from offset: Int) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
         guard (try? handle.seek(toOffset: UInt64(offset))) != nil,
               let data = try? handle.readToEnd() else { return nil }
 
         // 从任意字节偏移切进去可能把某个多字节字符劈成两半，解码失败就丢掉首行残缺部分
-        func decode(_ d: Data) -> String? {
-            if let s = String(data: d, encoding: .utf8) { return s }
-            if let nl = d.firstIndex(of: 0x0A) {
-                return String(data: d[d.index(after: nl)...], encoding: .utf8)
-            }
-            return nil
-        }
-        guard let text = decode(data) else { return nil }
-
-        for line in text.split(separator: "\n").reversed() {
-            guard line.contains("aiTitle") else { continue }
-            guard let lineData = line.data(using: .utf8),
-                  let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let raw = obj["aiTitle"] as? String else { continue }
-            let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !t.isEmpty { return t }
+        if let s = String(data: data, encoding: .utf8) { return s }
+        if let nl = data.firstIndex(of: 0x0A) {
+            return String(data: data[data.index(after: nl)...], encoding: .utf8)
         }
         return nil
     }

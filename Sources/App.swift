@@ -639,7 +639,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let rowsParent = NSMenuItem(title: "显示条数", action: nil, keyEquivalent: "")
         let rowsMenu = NSMenu()
         for n in [4, 6, 8] {
-            let it = NSMenuItem(title: "\(n) 条", action: #selector(setRows(_:)), keyEquivalent: "")
+            // 写「最多」——列表里有几条就画几行，不会补空行凑数
+            let it = NSMenuItem(title: "最多 \(n) 条", action: #selector(setRows(_:)), keyEquivalent: "")
             it.target = self
             it.tag = n
             it.state = (prefs.maxRows == n) ? .on : .off
