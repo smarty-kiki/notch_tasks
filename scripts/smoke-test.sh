@@ -88,14 +88,23 @@ cat > "$PROJ/7c7c7c7c-1111-2222-3333-444455556666.jsonl" <<'JSONL'
 {"type":"user","cwd":"/tmp/demo3","message":{"role":"user","content":[{"type":"tool_result"}]}}
 JSONL
 
+# 停在「等用户回应」的工具上 —— AskUserQuestion 发起后没有 tool_result，
+# 说明它就在等你回答，这种要判成「待确认」而不是「执行中」
+cat > "$PROJ/6b6b6b6b-1111-2222-3333-444455556666.jsonl" <<'JSONL'
+{"type":"ai-title","aiTitle":"示例：等你回答的会话"}
+{"type":"assistant","cwd":"/tmp/demo4","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_ask_1","name":"AskUserQuestion"}],"stop_reason":"tool_use"}}
+JSONL
+
 OUT2="$(HOME="$FAKE_HOME" "$BIN" --claude)"
-printf '%s\n' "$OUT2" | grep -q "只有会话记录在动的（最近 15 分钟）: 3 条" \
+printf '%s\n' "$OUT2" | grep -q "只有会话记录在动的（最近 15 分钟）: 4 条" \
   || fail "注册表漏记的会话没被发现"
 printf '%s\n' "$OUT2" | grep -q "推断 status=busy" || fail "没从 stop_reason=tool_use 推断出 busy"
 printf '%s\n' "$OUT2" | grep -q "推断 status=idle" || fail "没从 stop_reason=end_turn 推断出 idle"
 # 尾部是 user(tool_result) 的那条必须判成 busy，不能因为「没有 stop_reason」就当成空闲
 printf '%s\n' "$OUT2" | grep -A0 "cwd=/tmp/demo3" | grep -q "status=busy" \
   || fail "尾部是 tool_result 的会话被误判成空闲了"
+printf '%s\n' "$OUT2" | grep -A0 "cwd=/tmp/demo4" | grep -q "status=waiting" \
+  || fail "停在 AskUserQuestion 上的会话没被判成 waiting"
 printf '%s\n' "$OUT2" | grep -q "示例：正在跑工具的会话" || fail "没读到记录里的 aiTitle"
 printf '%s\n' "$OUT2" | grep -q "cwd=/tmp/demo" || fail "没读到记录里的 cwd"
 ok "注册表漏记的会话从记录补回（aiTitle / cwd / busy-idle 都对）"

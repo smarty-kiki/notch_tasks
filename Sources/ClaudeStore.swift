@@ -240,14 +240,10 @@ enum ClaudeStore {
                     cwd: cwd,
                     name: (cwd as NSString).lastPathComponent,
                     aiTitle: info.title,
-                    // 复用注册表那套词，让下游映射不用分叉。
-                    //
-                    // 只有「助手明确答完」才算空闲，其余一律当在跑 ——
-                    // 工具执行完写下的是一条 user(tool_result)，那条没有 stop_reason，
-                    // 而此刻助手马上就要接着干活。按「!= tool_use 就是空闲」判，
-                    // 会让正在跑的任务在列表里显示成「空闲」。
-                    status: info.lastStop == "end_turn" ? "idle" : "busy",
-                    waitingFor: nil,
+                    // 复用注册表那套词，让下游映射不用分叉
+                    status: inferredStatus(info),
+                    // 注册表里这类会写 "permission prompt"；我们从工具名给个等价的
+                    waitingFor: inferredStatus(info) == "waiting" ? waitingReason(info.pendingTool) : nil,
                     updatedAt: mtime,
                     alive: true,                  // 文件刚动过就算活着
                     isClaude: true,
@@ -259,6 +255,10 @@ enum ClaudeStore {
 
     // MARK: - 会话记录的尾部
 
+    /// 发起后**必须由用户回应**的工具 —— 它们停在「等结果」就是在等你。
+    /// （普通的 Bash / Edit 停在那儿分不清「在跑」还是「等你批准」，所以不列进来）
+    static let userFacingTools: Set<String> = ["AskUserQuestion", "ExitPlanMode"]
+
     /// 从会话记录尾部能读出来的东西
     struct TailInfo {
         /// Claude 给会话起的标题（= 终端标签名）
@@ -269,6 +269,9 @@ enum ClaudeStore {
         /// 只有 `end_turn` 表示「助手答完了、在等你」，其余（`tool_use`、
         /// 或者 user 消息那种压根没有 stop_reason 的）都还在往下走
         var lastStop: String?
+        /// 最后发起、但**没有拿到结果**的工具名。
+        /// 有些工具一发起就是在等人（见 `userFacingTools`），据此判断「待确认」
+        var pendingTool: String?
         static let empty = TailInfo()
     }
 
@@ -284,6 +287,28 @@ enum ClaudeStore {
             return tailInfoCached(path: path, size: size, mtime: mtime)
         }
         return .empty
+    }
+
+    /// 从记录尾部推断状态（注册表里没有的会话只能这么办）
+    ///
+    /// 两个信号，按可靠性排序：
+    /// 1. **停在等人回应的工具上** → `waiting`。`AskUserQuestion` / `ExitPlanMode`
+    ///    发起后本来就要用户回话，它们没拿到结果就说明人还没理它
+    /// 2. 否则看最后一条消息的 `stop_reason`：只有 `end_turn`（助手明确答完）才算
+    ///    `idle`，其余一律 `busy` —— 工具执行完写下的是 `user`(`tool_result`)，
+    ///    那条没有 `stop_reason`，而此刻助手马上就要接着干活
+    private static func inferredStatus(_ info: TailInfo) -> String {
+        if let tool = info.pendingTool, userFacingTools.contains(tool) { return "waiting" }
+        return info.lastStop == "end_turn" ? "idle" : "busy"
+    }
+
+    /// 推断出来的 waitingFor，和注册表里的取值（如 "permission prompt"）对齐
+    private static func waitingReason(_ tool: String?) -> String? {
+        switch tool {
+        case "AskUserQuestion": return "question"
+        case "ExitPlanMode":    return "plan approval"
+        default:                return nil
+        }
     }
 
     /// 带缓存地读尾部；标题偶尔很久才写一条，尾部没命中就退回整文件扫一次
@@ -311,12 +336,38 @@ enum ClaudeStore {
         guard let text = readText(at: path, from: offset) else { return .empty }
 
         var info = TailInfo.empty
+        // 已经拿到结果的工具调用。从后往前扫，先扫到的都是「更靠后」的，
+        // 所以轮到某个 tool_use 时，它之后有没有 tool_result 已经清楚了
+        var returned = Set<String>()
+
         for line in text.split(separator: "\n").reversed() {
             guard line.hasPrefix("{") else { continue }
             let needTitle = info.title == nil
             let needCwd = info.cwd == nil
             let needStop = info.lastStop == nil
-            if !needTitle && !needCwd && !needStop { break }
+            let needTool = info.pendingTool == nil
+            if !needTitle && !needCwd && !needStop && !needTool { break }
+
+            if line.contains("tool_result") {
+                if let o = jsonObject(line),
+                   let msg = o["message"] as? [String: Any],
+                   let content = msg["content"] as? [[String: Any]] {
+                    for c in content where (c["type"] as? String) == "tool_result" {
+                        if let id = c["tool_use_id"] as? String { returned.insert(id) }
+                    }
+                }
+            }
+            if needTool, line.contains("tool_use") {
+                if let o = jsonObject(line),
+                   let msg = o["message"] as? [String: Any],
+                   let content = msg["content"] as? [[String: Any]] {
+                    for c in content where (c["type"] as? String) == "tool_use" {
+                        if let id = c["id"] as? String, !returned.contains(id) {
+                            info.pendingTool = c["name"] as? String
+                        }
+                    }
+                }
+            }
 
             if needTitle, line.contains("aiTitle") {
                 if let o = jsonObject(line), let raw = o["aiTitle"] as? String {

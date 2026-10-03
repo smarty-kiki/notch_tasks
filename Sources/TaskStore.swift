@@ -368,6 +368,8 @@ final class TaskStore: ObservableObject {
         guard let raw, !raw.isEmpty else { return "等你确认" }
         switch raw.lowercased() {
         case "permission prompt", "permission": return "等你确认权限"
+        case "question":                         return "等你回答"
+        case "plan approval":                    return "等你批准计划"
         default: return "等你确认 · \(raw)"
         }
     }
