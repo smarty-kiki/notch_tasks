@@ -240,8 +240,13 @@ enum ClaudeStore {
                     cwd: cwd,
                     name: (cwd as NSString).lastPathComponent,
                     aiTitle: info.title,
-                    // 复用注册表那套词，让下游映射不用分叉
-                    status: info.lastStop == "tool_use" ? "busy" : "idle",
+                    // 复用注册表那套词，让下游映射不用分叉。
+                    //
+                    // 只有「助手明确答完」才算空闲，其余一律当在跑 ——
+                    // 工具执行完写下的是一条 user(tool_result)，那条没有 stop_reason，
+                    // 而此刻助手马上就要接着干活。按「!= tool_use 就是空闲」判，
+                    // 会让正在跑的任务在列表里显示成「空闲」。
+                    status: info.lastStop == "end_turn" ? "idle" : "busy",
                     waitingFor: nil,
                     updatedAt: mtime,
                     alive: true,                  // 文件刚动过就算活着
@@ -260,8 +265,9 @@ enum ClaudeStore {
         var title: String?
         /// 会话的工作目录
         var cwd: String?
-        /// 最后一条消息的 stop_reason：
-        /// `tool_use` = 正在跑工具，`end_turn` = 已经答完在等你
+        /// 最后一条消息的 `stop_reason`。
+        /// 只有 `end_turn` 表示「助手答完了、在等你」，其余（`tool_use`、
+        /// 或者 user 消息那种压根没有 stop_reason 的）都还在往下走
         var lastStop: String?
         static let empty = TailInfo()
     }
