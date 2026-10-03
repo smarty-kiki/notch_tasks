@@ -35,7 +35,12 @@ final class TaskStore: ObservableObject {
     private var doneBurst = 0
 
     /// 列表只看最近这段时间内的任务
-    private let historyWindow: TimeInterval = 7 * 86_400
+    /// 已结束的任务（已完成 / 失败 / 空闲下来的会话）在列表里还留多久。
+    /// 再久就没必要占位置了 —— 列表是「现在在发生什么」，不是历史记录。
+    ///
+    /// 配合 `TaskItem.recentDoneWindow`（10 分钟）看：结束 10 分钟内显示成明亮的
+    /// 「空闲」，10~20 分钟沉成灰蓝的「已完成」，再过一会儿就从列表里消失。
+    private let finishedWindow: TimeInterval = 20 * 60
     /// 未读结果只有在这个时间窗内才算「待确认」，更早的旧未读不再打扰
     private let confirmWindow: TimeInterval = 24 * 3_600
 
@@ -133,8 +138,19 @@ final class TaskStore: ObservableObject {
             items.append(contentsOf: fetchClaudeSessions())
         }
 
-        let historyCutoff = Date().addingTimeInterval(-historyWindow)
-        items.removeAll { !$0.state.isActive && $0.updatedAt < historyCutoff }
+        // 列表只留「还在跑的」和「刚结束的」。两处都不能按时间清：
+        //   - 跑着的（running）本来就不该动
+        //   - 等你确认的更不能动 —— 要是被时间清掉，提醒就等于丢了
+        let finishedCutoff = Date().addingTimeInterval(-finishedWindow)
+        items.removeAll { item in
+            if item.needsConfirm || item.state == .needConfirm { return false }
+            switch item.state {
+            case .done, .failed, .idle:
+                return item.updatedAt < finishedCutoff
+            case .running, .needConfirm:
+                return false
+            }
+        }
 
         isLive = true
         lastRefresh = Date()

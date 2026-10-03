@@ -166,7 +166,9 @@ getpwuid、**不认 `HOME` 环境变量**；而冒烟测试靠 `HOME=<临时目�
 - `needsConfirm` 为真 → 一律显示「待确认」。否则会出现标题栏写着「N 待确认」、
   列表里却看不出是哪一个
 - `done` 按 `recentDoneWindow`（10 分钟）分档：窗口内显示成明亮的「空闲」绿，
-  再久沉成灰蓝的「已完成」
+  再久沉成灰蓝的「已完成」；超出 `TaskStore.finishedWindow`（20 分钟）就直接从列表移走
+- **按时间清列表时必须排除「待确认」**（`needsConfirm` 或 `state == .needConfirm`）——
+  它们 `updatedAt` 往往很旧（任务早跑完了、只是你还没看），一清就把提醒丢了
 
 改配色/排序请改 `displayState` 那条链路，别去改 `state`——
 `state` 还牵扯告警级别和状态跃迁检测（`detectTransitions`）。
