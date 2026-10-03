@@ -3,7 +3,29 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.0.4] - 2026-10-03
+
+修掉三个让 CLI 任务「看不见」或「状态不对」的问题，并把列表改成只留近期的动静。
+
+### 修复
+
+- **会话没在 `~/.claude/sessions/` 注册时，整条任务在列表里消失**：
+  这个注册表**不是「所有活着的会话」的完整名单** —— 被程序 spawn 出来的 claude
+  （比如数字员工平台起的）照样写会话记录、照样在干活，却不写它。
+  实测同一时刻创建的两个 CLI 会话，一个注册了、一个没有，跟「按日清理」无关。
+  原来只看注册表，于是这类任务一条都看不见。
+  现在会话发现改成「注册表 ∪ 最近在动的记录」（`ClaudeStore.all()`）：
+  扫 `projects/*/*.jsonl`，最近 15 分钟还在写的算在跑，标题与 cwd 从记录里读；
+  注册表里有的仍用 Claude 自己写的 `status`，更准
+- **状态推断把「工具刚跑完」误判成空闲**：工具执行完写下的是
+  `user`(`tool_result`)，那条**没有** `stop_reason`；按「`tool_use` 才算在跑」判，
+  正在干活的任务会显示成「空闲」。改成**只有 `end_turn` 才算空闲**，其余一律当在跑
+- **「等你回答 / 等你批准」的会话显示成「执行中」**：`AskUserQuestion` /
+  `ExitPlanMode` 这类工具**发起后本来就要用户回话**，它们没拿到 `tool_result`
+  就说明人还没理它 —— 现在据此判成「待确认」，副标题写「等你回答」/「等你批准计划」。
+  （普通的 Bash / Edit 停在那儿仍然分不清「在跑」还是「等你批准」，
+  这类只有注册表里有 `status=waiting` 时才准）
+- `--claude` 自检相应分成「注册表里的」与「只有记录在动的」两段打印
 
 ### 变更
 
@@ -13,33 +35,6 @@
   **待确认的任务不受时间限制** —— 它们 `updatedAt` 往往很旧（任务早跑完、只是还没看），
   按时间清就等于把提醒丢了
 - 菜单里的条数改成「**最多** N 条」：列表里有几条就画几行，不补空行凑数
-
-### 修复
-
-- **「等你回答 / 等你批准」的会话显示成「执行中」**：从会话记录推断状态时，
-  只看最后一条消息的 `stop_reason`，看不出「停在那儿等你」。实际上
-  `AskUserQuestion` / `ExitPlanMode` 这类工具**发起后本来就要用户回话**，
-  它们没拿到 `tool_result` 就说明人还没理它 —— 现在据此判成「待确认」，
-  副标题写「等你回答」/「等你批准计划」。
-  （普通的 Bash / Edit 停在那儿仍然分不清「在跑」还是「等你批准」，
-  这类只有注册表里有 `status=waiting` 时才准）
-
-- **从会话记录推断状态时，把「工具刚跑完」误判成空闲**：原来的规则是
-  「`stop_reason == tool_use` 才算在跑」，但工具执行完写下的是
-  `user`(`tool_result`)、那条**没有** `stop_reason` —— 于是正在干活的任务
-  在列表里显示成「空闲」。改成**只有 `end_turn` 才算空闲**，其余一律当在跑
-  （宁可多显示一会儿执行中，也不要让在跑的任务看着像闲的）
-
-- **会话没在 `~/.claude/sessions/` 注册时，整条任务在列表里消失**：
-  这个注册表**不是「所有活着的会话」的完整名单** —— 被程序 spawn 出来的 claude
-  （比如数字员工平台起的）照样写会话记录、照样在干活，却不写它。
-  实测同一时刻创建的两个 CLI 会话，一个注册了、一个没有，跟「按日清理」无关。
-  原来只看注册表，于是这类任务一条都看不见。
-  现在会话发现改成「注册表 ∪ 最近在动的记录」（`ClaudeStore.all()`）：
-  扫 `projects/*/*.jsonl`，最近 15 分钟还在写的算在跑，标题与 cwd 从记录里读，
-  状态从尾部推断 —— 最后一条消息 `stop_reason == tool_use` 是在跑工具、
-  `end_turn` 是已经答完。注册表里有的仍用 Claude 自己写的 `status`，更准
-- `--claude` 自检相应分成「注册表里的」与「只有记录在动的」两段打印
 
 ## [1.0.3] - 2026-10-03
 
@@ -192,7 +187,8 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.4
 [1.0.3]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.3
 [1.0.2]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.2
 [1.0.1]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.1
