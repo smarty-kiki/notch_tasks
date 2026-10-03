@@ -163,13 +163,28 @@ if cliArgs.contains("--claude") {
     }
 
     print(String(repeating: "-", count: 78))
-    let all = ClaudeStore.scan()
-    let live = all.filter { $0.alive && $0.isClaude }
-    print("scan() 读到 \(all.count) 条；其中「进程活着且是 claude」\(live.count) 条")
-    for s in all {
-        print("  pid=\(s.pid) 存活=\(s.alive ? "是" : "否") 是claude=\(s.isClaude ? "是" : "否")"
+
+    let reg = ClaudeStore.liveSessions()
+    print("注册表里的会话: \(reg.count) 条")
+    for s in reg {
+        print("  [注册表] pid=\(s.pid) 存活=\(s.alive ? "是" : "否")"
+              + " 是claude=\(s.isClaude ? "是" : "否")"
               + " status=\(s.status) 标题=\(s.displayTitle)")
     }
+
+    // 注册表并不可靠 —— 被程序 spawn 出来的 claude 不写 sessions/<pid>.json，
+    // 但会话记录照样在动，所以还要靠记录兜一层
+    let known = Set(reg.compactMap { $0.sessionID.isEmpty ? nil : $0.sessionID })
+    let extra = ClaudeStore.recentFromTranscripts(within: 15 * 60, excluding: known)
+    print("只有会话记录在动的（最近 15 分钟）: \(extra.count) 条")
+    for s in extra {
+        print("  [记录]   session=\(s.sessionID.prefix(8))"
+              + " 推断 status=\(s.status) cwd=\(s.cwd.isEmpty ? "-" : s.cwd)"
+              + " 标题=\(s.displayTitle)")
+    }
+
+    print(String(repeating: "-", count: 78))
+    print("合计 \(reg.count + extra.count) 条会进列表")
     exit(0)
 }
 

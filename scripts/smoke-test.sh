@@ -35,7 +35,7 @@ grep -q "读取时间" "$TMP/dump.txt" || fail "--dump 输出不完整"
 ok "--dump 正常输出"
 
 # ---------------------------------------------------------------- 2
-echo "== 2/6 Claude 注册表被写坏时仍能解析出会话"
+echo "== 2/6 Claude 数据源：注册表写坏 / 注册表漏记"
 # Claude Code 重写 sessions/<pid>.json 时存在「内容变短但不截断」的竞态：
 # 旧内容更长时，文件尾部会留下上一次写下的残片，例如
 #     {...完整的对象...}51,"waitingFor":"permission prompt"}
@@ -62,6 +62,32 @@ JSON
 printf '%s\n' "$(HOME="$FAKE_HOME" "$BIN" --claude)" | grep -q "取值: pid=22222 name=demo-2 status=busy" \
   || fail "干净的注册表解析失败"
 ok "干净注册表照常解析"
+
+# 注册表**漏记**的会话也要能发现：被程序 spawn 出来的 claude（比如数字员工平台起的）
+# 照样写会话记录、照样在干活，却不写 sessions/<pid>.json。只看注册表会整条漏掉，
+# 所以会话发现是「注册表 ∪ 最近在动的记录」。这里用假的记录文件钉住这条逻辑。
+PROJ="$FAKE_HOME/.claude/projects/-tmp-demo"
+mkdir -p "$PROJ"
+
+cat > "$PROJ/9e9e9e9e-1111-2222-3333-444455556666.jsonl" <<'JSONL'
+{"type":"mode","sessionId":"9e9e9e9e-1111-2222-3333-444455556666"}
+{"type":"ai-title","aiTitle":"示例：正在跑工具的会话"}
+{"type":"assistant","cwd":"/tmp/demo","message":{"role":"assistant","content":[{"type":"tool_use"}],"stop_reason":"tool_use"}}
+JSONL
+
+cat > "$PROJ/8d8d8d8d-1111-2222-3333-444455556666.jsonl" <<'JSONL'
+{"type":"ai-title","aiTitle":"示例：已经答完的会话"}
+{"type":"assistant","cwd":"/tmp/demo2","message":{"role":"assistant","content":[{"type":"text"}],"stop_reason":"end_turn"}}
+JSONL
+
+OUT2="$(HOME="$FAKE_HOME" "$BIN" --claude)"
+printf '%s\n' "$OUT2" | grep -q "只有会话记录在动的（最近 15 分钟）: 2 条" \
+  || fail "注册表漏记的会话没被发现"
+printf '%s\n' "$OUT2" | grep -q "推断 status=busy" || fail "没从 stop_reason=tool_use 推断出 busy"
+printf '%s\n' "$OUT2" | grep -q "推断 status=idle" || fail "没从 stop_reason=end_turn 推断出 idle"
+printf '%s\n' "$OUT2" | grep -q "示例：正在跑工具的会话" || fail "没读到记录里的 aiTitle"
+printf '%s\n' "$OUT2" | grep -q "cwd=/tmp/demo" || fail "没读到记录里的 cwd"
+ok "注册表漏记的会话从记录补回（aiTitle / cwd / busy-idle 都对）"
 
 # ---------------------------------------------------------------- 3
 echo "== 3/6 状态映射（WorkBuddy 与 Claude CLI 统一到同一套）"

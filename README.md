@@ -141,6 +141,14 @@ cd notch_tasks
 
 两个数据源都不存在时（没装 WorkBuddy、没跑过 Claude Code）也不会崩，面板只显示空状态。
 
+> **CLI 会话的发现是「注册表 ∪ 最近在动的记录」**，不能只看注册表：
+> `~/.claude/sessions/<pid>.json` 会漏 —— 被程序 spawn 出来的 claude（比如数字员工
+> 平台起的）照样写会话记录、照样在干活，却不写这个文件（实测：同一时刻创建的两个会话，
+> 一个注册了、一个没有，跟「按日清理」无关）。
+> 所以反过来也以**会话记录**为准：谁的文件最近还在动，谁就在跑（15 分钟窗口），
+> 状态从记录尾部推断 —— 最后一条消息 `stop_reason == tool_use` 是在跑工具，
+> `end_turn` 是已经答完。注册表里有的仍用 Claude 自己写的 `status`，更准。
+
 <details>
 <summary>CLI 那边的 <code>status</code> 是怎么读的</summary>
 
@@ -181,9 +189,10 @@ cd notch_tasks
 ## 常见问题
 
 **列表里一个 Claude Code CLI 会话都没有？**
-有三种原因，`./build/NotchTasks --claude` 能一眼分开：进程真的退了；
-`sessions/` 被 Claude Code 按日清理过（清完那一刻是空的）；注册表文件被写坏过。
-三种都不影响 WorkBuddy 那边的显示。
+大概率是本来就没会话在跑。`./build/NotchTasks --claude` 能把几种情况分开：
+进程真的退了、`sessions/` 被按日清理过（清完那一刻是空的）、注册表文件被写坏过、
+或者会话压根没注册（见上面「CLI 会话的发现」—— 这类会从会话记录里补回来）。
+都不影响 WorkBuddy 那边的显示。
 
 **打开被拦、提示"无法验证开发者"？**
 产物是 ad-hoc 签名，没有 Developer ID。右键点图标 →「打开」，或跑一次上面那条 `xattr` 命令。

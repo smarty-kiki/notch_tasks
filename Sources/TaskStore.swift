@@ -302,7 +302,9 @@ final class TaskStore: ObservableObject {
     // MARK: - 查询：终端里的 Claude Code CLI
 
     private func fetchClaudeSessions() -> [TaskItem] {
-        return ClaudeStore.liveSessions().map { s in
+        // 用 all() 而不是 liveSessions()：注册表会漏会话（被程序 spawn 出来的 claude
+        // 不写 sessions/<pid>.json），拿会话记录兜住，否则那些任务在列表里完全不见
+        return ClaudeStore.all().map { s in
             // Claude Code 的 status 已知取值：busy / idle / waiting，
             // 和 WorkBuddy 那边的映射对齐（同一个词 = 同一件事）：
             //
@@ -330,11 +332,14 @@ final class TaskStore: ObservableObject {
             default:        state = .running
             }
 
-            return TaskItem(id: "\(s.pid)",
+            // 从记录发现的会话没有 PID，用 sessionId 当 id —— 两种来源下都唯一
+            let id = s.sessionID.isEmpty ? "\(s.pid)" : s.sessionID
+
+            return TaskItem(id: id,
                             kind: .claude,
                             title: s.displayTitle,   // Claude 起的会话标题，和终端标签一致
                             detail: detail,
-                            cwd: s.cwd,
+                            cwd: s.cwd.isEmpty ? nil : s.cwd,
                             state: state,
                             updatedAt: s.updatedAt,
                             // 等确认才算「待确认」，并套时间窗，避免僵尸会话一直亮着
