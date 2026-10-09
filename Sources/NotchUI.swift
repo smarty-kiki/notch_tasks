@@ -39,8 +39,9 @@ final class UIState: ObservableObject {
     let tabNotchRadius: CGFloat = 8
     let panelNotchRadius: CGFloat = 14
 
-    /// 把手形状顶边距屏幕顶部
-    var shapeTopOffset: CGFloat = 104
+    /// 把手形状顶边距屏幕顶部。
+    /// 下移过一档（104 → 204）：104 太靠上，容易压住别的窗口右上角的关键区域。
+    var shapeTopOffset: CGFloat = 204
 
     // MARK: 底栏按钮（固定宽度，好让点击命中可以精确算出来）
 
