@@ -3,6 +3,16 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.5] - 2026-10-10
+
+把把手往下挪一档，不再压住别的窗口右上角。
+
+### 变更
+
+- **把手下移 100pt（距顶 104 → 204）**：原来贴在屏幕右上角，常挡住别的窗口
+  右上角的关键区域（关闭按钮、工具栏那一片）；下移后不再抢那块地方，
+  也不会挡到菜单栏图标
+
 ## [1.0.4] - 2026-10-03
 
 修掉三个让 CLI 任务「看不见」或「状态不对」的问题，并把列表改成只留近期的动静。
@@ -187,7 +197,8 @@
 - 列表只显示 7 天内的任务；「等你确认」与「有未读结果」都套 24 小时窗口，
   避免一个没人理会的旧状态让把手永久亮着
 
-[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/smarty-kiki/notch_tasks/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.5
 [1.0.4]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.4
 [1.0.3]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.3
 [1.0.2]: https://github.com/smarty-kiki/notch_tasks/releases/tag/v1.0.2
